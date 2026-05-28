@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  passwordHash  String
+  rohlikEmail   String?
+  rohlikPassEnc String?  // AES encrypted password
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  preferences   UserPreferences?
+  mealPlans     MealPlan[]
+  orders        Order[]
+}
+
+model UserPreferences {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  healthLevel          Int      @default(7)   // 1-10
+  tastyLevel           Int      @default(7)   // 1-10
+  householdSize        Int      @default(2)
+  weeklyBudget         Float    @default(2000) // CZK
+  deliveryDay          String   @default("wednesday") // monday-sunday
+  deliveryTime         String   @default("morning")   // morning/afternoon/evening
+
+  isVegetarian         Boolean  @default(false)
+  isVegan              Boolean  @default(false)
+  isGlutenFree         Boolean  @default(false)
+  isLactoseFree        Boolean  @default(false)
+  allergies            String?  // comma separated
+
+  cuisinePreferences   String?  // e.g. "italian,asian,czech"
+  dislikedIngredients  String?  // e.g. "mushrooms,liver"
+
+  autoOrderEnabled     Boolean  @default(false)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model MealPlan {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weekStart  DateTime
+  meals      Json           // { monday: { breakfast, lunch, dinner }, ... }
+  recipes    Json           // { recipeName: { ingredients, steps, time } }
+  shoppingList Json         // [{ name, amount, unit, category }]
+
+  status     MealPlanStatus @default(DRAFT)
+  notes      String?
+
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  orders     Order[]
+
+  @@index([userId, weekStart])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlanId  String?
+  mealPlan    MealPlan?   @relation(fields: [mealPlanId], references: [id])
+
+  rohlikCartItems Json?   // items added to Rohlik cart
+  rohlikOrderUrl  String? // link to Rohlik checkout
+  estimatedTotal  Float?
+  actualTotal     Float?
+
+  status      OrderStatus @default(PENDING)
+  notes       String?
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+enum MealPlanStatus {
+  DRAFT
+  CONFIRMED
+  ORDERED
+  COMPLETED
+}
+
+enum OrderStatus {
+  PENDING
+  CART_FILLED
+  CONFIRMED_BY_USER
+  DELIVERED
+  CANCELLED
+}
