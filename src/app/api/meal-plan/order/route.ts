@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         mealPlanId: plan.id,
         rohlikCartItems: result.addedItems,
-        rohlikOrderUrl: result.cartUrl ?? "https://www.rohlik.cz/kosik",
+        rohlikOrderUrl: result.cartUrl ?? "https://www.rohlik.cz",
         estimatedTotal: result.estimatedTotal,
         status: "CART_FILLED",
       },

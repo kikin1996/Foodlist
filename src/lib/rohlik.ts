@@ -7,8 +7,16 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ROHLIK_MCP_URL = "https://mcp.rohlik.cz/mcp";
 
-// Pouze nástroje potřebné pro vyhledání a košík — ostatní ignorujeme
-const ALLOWED_TOOLS = ["search", "addToCart", "getCart", "searchProducts", "add_to_cart", "search_products", "cart_add"];
+// Pouze nástroje potřebné pro vyhledání a košík
+const ALLOWED_TOOLS = [
+  "batch_search_products",
+  "add_items_to_cart",
+  "get_cart",
+  "get_product_details",
+  "update_cart_item",
+  "remove_cart_item",
+  "clear_cart",
+];
 
 export interface RohlikCartResult {
   addedItems: { name: string; rohlikName: string; price: number; amount: string }[];
@@ -65,10 +73,9 @@ export async function fillRohlikCart(
 
     // Filtruj jen relevantní nástroje — šetří input tokeny
     const allTools = toolsResponse.tools;
-    const filteredTools = allTools.filter((t) =>
-      ALLOWED_TOOLS.some((name) => t.name.toLowerCase().includes(name.toLowerCase()))
-    );
-    const toolsToUse = filteredTools.length > 0 ? filteredTools : allTools.slice(0, 6);
+    const filteredTools = allTools.filter((t) => ALLOWED_TOOLS.includes(t.name));
+    const toolsToUse = filteredTools.length > 0 ? filteredTools : allTools.slice(0, 8);
+    console.log("Tools to use:", toolsToUse.map(t => t.name).join(", "));
 
     console.log(`Rohlik MCP tools: ${allTools.length} total, using ${toolsToUse.length}`);
 
@@ -85,7 +92,7 @@ export async function fillRohlikCart(
     const messages: Anthropic.MessageParam[] = [
       {
         role: "user",
-        content: `Přidej do košíku na Rohlík.cz (pro ${householdSize} osob):\n${itemsText}\n\nPo dokončení vrať JSON:\n{"addedItems":[{"name":"orig","rohlikName":"rohlik","price":0,"amount":""}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}`,
+        content: `Přidej do košíku na Rohlík.cz (pro ${householdSize} osob):\n${itemsText}\n\nPo dokončení vrať JSON:\n{"addedItems":[{"name":"orig","rohlikName":"rohlik","price":0,"amount":""}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz"}`,
       },
     ];
 
@@ -97,7 +104,17 @@ export async function fillRohlikCart(
           model: "claude-haiku-4-5-20251001",
           max_tokens: 4096,
           tools: mcpTools,
-          system: "Jsi nákupní asistent. Vyhledej produkty na Rohlík.cz a přidej je do košíku. Buď stručný.",
+          system: `Jsi nákupní asistent na Rohlík.cz. Máš tyto nástroje:
+- batch_search_products: vyhledej produkty. Argument: {"queries": [{"keyword": "název produktu"}]} — queries je POLE OBJEKTŮ s klíčem "keyword"
+- add_items_to_cart: přidej do košíku. Argument: {"items": [{"productId": 123, "quantity": 1}]} — POVINNÝ klíč je "quantity" ne "amount"!
+- get_cart: zobraz košík (bez argumentů)
+
+Postup:
+1) Vyhledej každou položku pomocí batch_search_products (max 4 najednou)
+2) Z výsledků vyber nejlepší produkt (správná gramáž, rozumná cena)
+3) Přidej do košíku pomocí add_items_to_cart
+4) Opakuj dokud nejsou všechny položky v košíku
+5) Vrať JSON výsledek`,
           messages,
         })
       );
@@ -123,7 +140,7 @@ export async function fillRohlikCart(
         messages.push({ role: "assistant", content: response.content });
         messages.push({
           role: "user",
-          content: 'Shrň výsledek jako JSON: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":["string"],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}',
+          content: 'Shrň výsledek jako JSON: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":["string"],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz"}',
         });
         continue;
       }
@@ -134,7 +151,7 @@ export async function fillRohlikCart(
         messages.push({ role: "assistant", content: response.content });
         messages.push({
           role: "user",
-          content: 'Vrať JSON shrnutí co jsi přidal do košíku: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}',
+          content: 'Vrať JSON shrnutí co jsi přidal do košíku: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz"}',
         });
         continue;
       }
