@@ -77,27 +77,34 @@ export async function generateMealPlan(prefs: UserPreferences): Promise<WeeklyMe
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 8192,
+    max_tokens: 16000,
     system: buildSystemPrompt(prefs),
     messages: [
       {
         role: "user",
-        content: `Vytvoř kompletní týdenní jídelníček pro dny: ${days.join(", ")}.
+        content: `Vytvoř týdenní jídelníček pro dny: ${days.join(", ")}.
 
-Vrať JSON v přesně tomto formátu:
+DŮLEŽITÉ: Buď stručný! Maximálně 3 kroky na recept, max 6 ingrediencí na recept.
+
+Vrať POUZE validní JSON (žádný text před ani po):
 {
   "meals": {
     "pondeli": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    ... pro každý den
+    "utery": { "breakfast": "název", "lunch": "název", "dinner": "název" },
+    "streda": { "breakfast": "název", "lunch": "název", "dinner": "název" },
+    "ctvrtek": { "breakfast": "název", "lunch": "název", "dinner": "název" },
+    "patek": { "breakfast": "název", "lunch": "název", "dinner": "název" },
+    "sobota": { "breakfast": "název", "lunch": "název", "dinner": "název" },
+    "nedele": { "breakfast": "název", "lunch": "název", "dinner": "název" }
   },
   "recipes": {
-    "název receptu": {
+    "přesný název z meals": {
       "name": "název",
-      "time": 30,
+      "time": 20,
       "servings": ${prefs.householdSize},
       "ingredients": [{ "name": "ingredience", "amount": "200g" }],
-      "steps": ["krok 1", "krok 2"],
-      "calories": 450
+      "steps": ["Krok 1.", "Krok 2.", "Krok 3."],
+      "calories": 400
     }
   },
   "shoppingList": [
@@ -105,7 +112,8 @@ Vrať JSON v přesně tomto formátu:
   ]
 }
 
-Kategorie pro shoppingList: zelenina, ovoce, maso, mlecne, pecivo, suche, ostatni`,
+Kategorie: zelenina, ovoce, maso, mlecne, pecivo, suche, ostatni
+Recepty pouze pro unikátní jídla (nesnídaně jako ovesná kaše nemusí mít recept).`,
       },
     ],
   });

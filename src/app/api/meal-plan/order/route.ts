@@ -71,9 +71,10 @@ export async function POST(req: NextRequest) {
       notFoundItems: result.notFoundItems,
     });
   } catch (err) {
-    console.error("Rohlik order error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Rohlik order error:", msg);
     return NextResponse.json(
-      { error: "Nakupování na Rohlíku selhalo. Zkontrolujte přihlašovací údaje." },
+      { error: msg },
       { status: 500 }
     );
   }

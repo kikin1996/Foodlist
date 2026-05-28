@@ -7,6 +7,9 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ROHLIK_MCP_URL = "https://mcp.rohlik.cz/mcp";
 
+// Pouze nástroje potřebné pro vyhledání a košík — ostatní ignorujeme
+const ALLOWED_TOOLS = ["search", "addToCart", "getCart", "searchProducts", "add_to_cart", "search_products", "cart_add"];
+
 export interface RohlikCartResult {
   addedItems: { name: string; rohlikName: string; price: number; amount: string }[];
   notFoundItems: string[];
@@ -29,6 +32,26 @@ async function createRohlikClient(email: string, password: string): Promise<Clie
   return client;
 }
 
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isRateLimit = err instanceof Anthropic.RateLimitError ||
+        (err instanceof Error && err.message.includes("429"));
+
+      if (isRateLimit && attempt < maxRetries - 1) {
+        const waitMs = (attempt + 1) * 70000; // 70s, 140s
+        console.log(`Rate limit hit, waiting ${waitMs / 1000}s before retry ${attempt + 1}...`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 export async function fillRohlikCart(
   shoppingList: ShoppingItem[],
   rohlikEmail: string,
@@ -39,9 +62,19 @@ export async function fillRohlikCart(
 
   try {
     const toolsResponse = await mcpClient.listTools();
-    const mcpTools: Anthropic.Tool[] = toolsResponse.tools.map((t) => ({
+
+    // Filtruj jen relevantní nástroje — šetří input tokeny
+    const allTools = toolsResponse.tools;
+    const filteredTools = allTools.filter((t) =>
+      ALLOWED_TOOLS.some((name) => t.name.toLowerCase().includes(name.toLowerCase()))
+    );
+    const toolsToUse = filteredTools.length > 0 ? filteredTools : allTools.slice(0, 6);
+
+    console.log(`Rohlik MCP tools: ${allTools.length} total, using ${toolsToUse.length}`);
+
+    const mcpTools: Anthropic.Tool[] = toolsToUse.map((t) => ({
       name: t.name,
-      description: t.description ?? "",
+      description: (t.description ?? "").slice(0, 200), // zkrátíme popis
       input_schema: (t.inputSchema as Anthropic.Tool["input_schema"]) ?? { type: "object", properties: {} },
     }));
 
@@ -52,49 +85,66 @@ export async function fillRohlikCart(
     const messages: Anthropic.MessageParam[] = [
       {
         role: "user",
-        content: `Přidej tyto položky do košíku na Rohlík.cz pro ${householdSize} osob. Pro každou položku nejdřív vyhledej produkt, pak ho přidej do košíku ve správném množství.
-
-Položky:
-${itemsText}
-
-Po přidání všech položek vrať JSON:
-{
-  "addedItems": [{ "name": "původní název", "rohlikName": "název na rohlíku", "price": 39.90, "amount": "500g" }],
-  "notFoundItems": ["položky co nebyly nalezeny"],
-  "estimatedTotal": 1250.50,
-  "cartUrl": "https://www.rohlik.cz/kosik"
-}`,
+        content: `Přidej do košíku na Rohlík.cz (pro ${householdSize} osob):\n${itemsText}\n\nPo dokončení vrať JSON:\n{"addedItems":[{"name":"orig","rohlikName":"rohlik","price":0,"amount":""}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}`,
       },
     ];
 
-    // Agentic loop – Claude volá Rohlík MCP tools dokud neskončí
-    while (true) {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        tools: mcpTools,
-        system: "Jsi nákupní asistent. Vyhledáš produkty na Rohlík.cz a přidáš je do košíku. Pracuj systematicky a efektivně.",
-        messages,
-      });
+    // Agentic loop s retry na rate limit
+    let loopCount = 0;
+    while (loopCount++ < 20) {
+      const response = await withRetry(() =>
+        anthropic.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 4096,
+          tools: mcpTools,
+          system: "Jsi nákupní asistent. Vyhledej produkty na Rohlík.cz a přidej je do košíku. Buď stručný.",
+          messages,
+        })
+      );
 
       if (response.stop_reason === "end_turn") {
-        // Claude skončil – extrahuj JSON výsledek
         const text = response.content
           .filter((b) => b.type === "text")
           .map((b) => (b as Anthropic.TextBlock).text)
           .join("");
 
+        console.log("Claude final response:", text.slice(0, 500));
+
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) throw new Error("Claude nevrátil JSON výsledek");
-        return JSON.parse(jsonMatch[0]) as RohlikCartResult;
+        if (jsonMatch) {
+          try {
+            return JSON.parse(jsonMatch[0]) as RohlikCartResult;
+          } catch {
+            console.log("JSON parse failed, using fallback");
+          }
+        }
+
+        // Fallback — Claude nakoupil ale nevrátil JSON → zeptej se znovu
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({
+          role: "user",
+          content: 'Shrň výsledek jako JSON: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":["string"],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}',
+        });
+        continue;
       }
 
-      if (response.stop_reason !== "tool_use") break;
+      console.log("stop_reason:", response.stop_reason);
+      if (response.stop_reason === "max_tokens") {
+        // Dosáhli jsme limitu tokenů — požádej o shrnutí
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({
+          role: "user",
+          content: 'Vrať JSON shrnutí co jsi přidal do košíku: {"addedItems":[{"name":"string","rohlikName":"string","price":0,"amount":"string"}],"notFoundItems":[],"estimatedTotal":0,"cartUrl":"https://www.rohlik.cz/kosik"}',
+        });
+        continue;
+      }
+      if (response.stop_reason !== "tool_use") {
+        console.log("Unexpected stop_reason:", response.stop_reason, response.content);
+        break;
+      }
 
-      // Přidej assistant response do messages
       messages.push({ role: "assistant", content: response.content });
 
-      // Zpracuj tool calls
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const block of response.content) {
         if (block.type !== "tool_use") continue;
@@ -107,7 +157,7 @@ Po přidání všech položek vrať JSON:
           toolResults.push({
             type: "tool_result",
             tool_use_id: block.id,
-            content: JSON.stringify(result.content),
+            content: JSON.stringify(result.content).slice(0, 2000), // limituj odpověď
           });
         } catch (err) {
           toolResults.push({

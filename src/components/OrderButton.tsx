@@ -17,6 +17,10 @@ export default function OrderButton({ mealPlanId }: { mealPlanId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mealPlanId }),
       });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server vrátil ${res.status} – zkuste se odhlásit a znovu přihlásit`);
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Objednávka selhala");
       router.refresh();

@@ -1,21 +1,26 @@
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
-export default auth((req) => {
+const PROTECTED_PAGES = ["/dashboard", "/preferences", "/onboarding"];
+
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const PUBLIC_PATHS = ["/", "/login", "/register"];
 
-  const isPublic =
-    PUBLIC_PATHS.includes(pathname) ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/_next") ||
-    pathname.includes("favicon");
+  // Ochrana pouze stránek (ne API — ty mají vlastní auth check)
+  const isProtectedPage = PROTECTED_PAGES.some((p) => pathname.startsWith(p));
+  if (!isProtectedPage) return NextResponse.next();
 
-  if (!isPublic && !req.auth) {
-    const loginUrl = new URL("/login", req.url);
-    return Response.redirect(loginUrl);
+  // Zkontroluj session cookie od NextAuth v5
+  const sessionToken =
+    req.cookies.get("authjs.session-token")?.value ??
+    req.cookies.get("__Secure-authjs.session-token")?.value;
+
+  if (!sessionToken) {
+    return NextResponse.redirect(new URL("/login", req.url));
   }
-});
+
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/dashboard/:path*", "/preferences/:path*", "/onboarding/:path*"],
 };
