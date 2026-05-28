@@ -117,16 +117,14 @@ export default async function DashboardPage() {
                 Zkontrolujte ho a potvrďte objednávku.
               </div>
               <div className="flex gap-3 mt-3">
-                {currentOrder.rohlikOrderUrl && (
-                  <a
-                    href={currentOrder.rohlikOrderUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
-                  >
-                    Otevřít Rohlík košík
-                  </a>
-                )}
+                <a
+                  href="https://www.rohlik.cz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
+                >
+                  Otevřít Rohlík.cz
+                </a>
                 <form action="/api/orders/confirm" method="POST">
                   <input type="hidden" name="orderId" value={currentOrder.id} />
                   <button
