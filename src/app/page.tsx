@@ -9,7 +9,7 @@ export default function HomePage() {
           <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">F</span>
           </div>
-          <span className="font-bold text-gray-900 text-lg">FoodList</span>
+          <span className="font-bold text-gray-900 text-lg">Kostki</span>
         </div>
         <div className="flex gap-3">
           <Link
@@ -139,7 +139,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">
-        FoodList © 2025 · Vytvořeno s Claude AI + Rohlík MCP
+        Kostki © 2025 · Vytvořeno s Claude AI + Rohlík MCP
       </footer>
     </div>
   );

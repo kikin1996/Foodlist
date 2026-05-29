@@ -35,7 +35,7 @@ async function createRohlikClient(email: string, password: string): Promise<Clie
     },
   });
 
-  const client = new Client({ name: "foodlist", version: "1.0.0" });
+  const client = new Client({ name: "kostki", version: "1.0.0" });
   await client.connect(transport);
   return client;
 }

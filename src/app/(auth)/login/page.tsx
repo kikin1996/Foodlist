@@ -45,7 +45,7 @@ function LoginForm() {
             <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
               <span className="text-white font-bold">F</span>
             </div>
-            <span className="font-bold text-gray-900 text-xl">FoodList</span>
+            <span className="font-bold text-gray-900 text-xl">Kostki</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Přihlásit se</h1>
           <p className="text-gray-500 mt-1">Pokračujte ve zdravém stravování</p>

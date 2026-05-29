@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FoodList – Nakupujeme za vás",
+  title: "Kostki – Nakupujeme za vás",
   description: "AI jídelníček + automatický nákup na Rohlík.cz. Zdravě, chutně, bez starostí.",
 };
 

@@ -23,7 +23,7 @@ export default async function PreferencesPage() {
             <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">F</span>
             </div>
-            <span className="font-bold text-gray-900">FoodList</span>
+            <span className="font-bold text-gray-900">Kostki</span>
           </Link>
           <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">
             ← Zpět na dashboard
