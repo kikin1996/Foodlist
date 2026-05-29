@@ -130,7 +130,7 @@ export async function fillRohlikCart(
     });
 
     const claudeText = (claudeResp.content[0] as Anthropic.TextBlock).text;
-    const match = claudeText.match(/\[[\s\S]*?\]/);
+    const match = claudeText.match(/\[[\s\S]*\]/);
     const selections: { n: string; id: number | null }[] = match ? JSON.parse(match[0]) : [];
 
     // ── FÁZE 3: Jedno hromadné přidání do košíku ──

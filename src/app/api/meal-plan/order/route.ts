@@ -65,11 +65,19 @@ export async function POST(req: NextRequest) {
       data: { status: "ORDERED" },
     });
 
+    const total = shoppingList.length;
+    const added = result.addedItems.length;
+    const missing = result.notFoundItems.length;
+
     return NextResponse.json({
       orderId: order.id,
       estimatedTotal: result.estimatedTotal,
-      addedItems: result.addedItems.length,
+      addedItems: added,
+      totalItems: total,
       notFoundItems: result.notFoundItems,
+      warning: missing > 0
+        ? `${added}/${total} položek přidáno. Nenalezeno: ${result.notFoundItems.slice(0, 5).join(", ")}${missing > 5 ? ` a ${missing - 5} dalších` : ""}`
+        : null,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -7,10 +7,12 @@ export default function OrderButton({ mealPlanId }: { mealPlanId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
 
   async function handleOrder() {
     setLoading(true);
     setError("");
+    setWarning("");
     try {
       const res = await fetch("/api/meal-plan/order", {
         method: "POST",
@@ -23,6 +25,7 @@ export default function OrderButton({ mealPlanId }: { mealPlanId: string }) {
       }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Objednávka selhala");
+      if (data.warning) setWarning(data.warning);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nastala chyba");
@@ -32,7 +35,7 @@ export default function OrderButton({ mealPlanId }: { mealPlanId: string }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-1.5">
       <button
         onClick={handleOrder}
         disabled={loading}
@@ -50,7 +53,12 @@ export default function OrderButton({ mealPlanId }: { mealPlanId: string }) {
           "🛒 Nakoupit na Rohlíku"
         )}
       </button>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {warning && (
+        <p className="text-xs text-amber-600 max-w-xs text-right">
+          ⚠️ {warning}
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600 max-w-xs text-right">{error}</p>}
     </div>
   );
 }
