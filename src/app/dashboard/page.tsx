@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import MealPlanView from "@/components/MealPlanView";
 import GeneratePlanButton from "@/components/GeneratePlanButton";
+import ResetPlanButton from "@/components/ResetPlanButton";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -158,7 +159,8 @@ export default async function DashboardPage() {
 
         {/* Generate new plan button (when plan exists) */}
         {currentPlan && (
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex items-center justify-between">
+            <ResetPlanButton />
             <GeneratePlanButton label="Vygenerovat nový jídelníček" />
           </div>
         )}
