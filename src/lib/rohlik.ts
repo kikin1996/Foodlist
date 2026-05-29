@@ -42,16 +42,52 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
-// Vyhledá dávku položek přes MCP (bez Claude)
+// Vyhledá dávku položek přes MCP s retry na Cloudflare rate limit
 async function searchBatch(client: Client, keywords: string[]): Promise<Record<string, RohlikProduct[]>> {
   const queries = keywords.map((k) => ({ keyword: k }));
-  const result = await client.callTool({ name: "batch_search_products", arguments: { queries } });
-  const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
-  const map: Record<string, RohlikProduct[]> = {};
-  for (const r of data.results ?? []) {
-    map[r.query.keyword] = (r.products ?? []).filter((p: RohlikProduct) => p.inStock).slice(0, 5);
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const result = await client.callTool({ name: "batch_search_products", arguments: { queries } });
+      const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
+      const map: Record<string, RohlikProduct[]> = {};
+      for (const r of data.results ?? []) {
+        map[r.query.keyword] = (r.products ?? []).filter((p: RohlikProduct) => p.inStock).slice(0, 5);
+      }
+      return map;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRateLimit = msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429");
+      if (isRateLimit && attempt < 4) {
+        const wait = (attempt + 1) * 35000; // 35s, 70s, 105s, 140s
+        console.log(`Cloudflare rate limit, čekám ${wait / 1000}s (pokus ${attempt + 1}/5)...`);
+        await sleep(wait);
+        continue;
+      }
+      throw err;
+    }
   }
-  return map;
+  return {};
+}
+
+// Přidá do košíku s retry
+async function addToCartWithRetry(client: Client, items: { productId: number; quantity: number }[]) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const result = await client.callTool({ name: "add_items_to_cart", arguments: { items } });
+      return JSON.parse((result.content as { type: string; text: string }[])[0].text);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isRateLimit = msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429");
+      if (isRateLimit && attempt < 4) {
+        const wait = (attempt + 1) * 35000;
+        console.log(`Cloudflare rate limit (add_to_cart), čekám ${wait / 1000}s...`);
+        await sleep(wait);
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 // Claude vybere nejlepší produkt z výsledků (jedna call pro celou dávku)
@@ -133,11 +169,7 @@ export async function fillRohlikCart(
           )),
         }));
 
-        const addResult = await mcpClient.callTool({
-          name: "add_items_to_cart",
-          arguments: { items },
-        });
-        const addData = JSON.parse((addResult.content as { type: string; text: string }[])[0].text);
+        const addData = await addToCartWithRetry(mcpClient, items);
 
         for (const s of toAdd) {
           const failed = (addData.items_failed_to_add ?? []).includes(String(s.product!.productId));
@@ -154,8 +186,8 @@ export async function fillRohlikCart(
         }
       }
 
-      // Počkej mezi dávkami aby nedošlo k rate limitu
-      if (bi < batches.length - 1) await sleep(2000);
+      // Počkej mezi dávkami — Cloudflare limit na mcp.rohlik.cz
+      if (bi < batches.length - 1) await sleep(8000);
     }
 
     const estimatedTotal = addedItems.reduce((sum, i) => sum + i.price, 0);
