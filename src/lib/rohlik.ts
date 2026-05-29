@@ -75,7 +75,7 @@ export async function fillRohlikCart(
   shoppingList: ShoppingItem[],
   rohlikEmail: string,
   rohlikPassword: string,
-  householdSize: number
+  _householdSize: number
 ): Promise<RohlikCartResult> {
   const mcpClient = await createRohlikClient(rohlikEmail, rohlikPassword);
 
