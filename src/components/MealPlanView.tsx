@@ -38,6 +38,11 @@ interface MealPlanViewProps {
 
 export default function MealPlanView({ plan }: MealPlanViewProps) {
   const [activeTab, setActiveTab] = useState<"meals" | "shopping" | "recipes">("meals");
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+
+  function toggleCategory(cat: string) {
+    setOpenCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  }
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
 
   const meals = plan.meals as Record<string, Record<string, string>>;
@@ -141,29 +146,47 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
             )}
           </div>
 
-          <div className="space-y-5">
-            {categories.map((cat) => (
-              <div key={cat}>
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-                  {categoryIcons[cat]} {categoryLabels[cat] ?? cat}
+          <div className="space-y-2">
+            {categories.map((cat) => {
+              const items = shoppingList.filter((i) => i.category === cat);
+              const isOpen = !!openCategories[cat];
+              return (
+                <div key={cat} className="border border-gray-100 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => toggleCategory(cat)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{categoryIcons[cat]}</span>
+                      <span className="font-medium text-gray-800 text-sm">
+                        {categoryLabels[cat] ?? cat}
+                      </span>
+                      <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-200">
+                        {items.length}
+                      </span>
+                    </div>
+                    <span className={`text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
+                      ▾
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="divide-y divide-gray-50">
+                      {items.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between px-4 py-2.5"
+                        >
+                          <span className="text-sm text-gray-700">{item.name}</span>
+                          <span className="text-sm text-gray-500 font-medium">
+                            {item.amount} {item.unit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  {shoppingList
-                    .filter((i) => i.category === cat)
-                    .map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0"
-                      >
-                        <span className="text-sm text-gray-800">{item.name}</span>
-                        <span className="text-sm text-gray-500 font-medium">
-                          {item.amount} {item.unit}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
