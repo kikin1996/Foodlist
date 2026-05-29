@@ -169,8 +169,34 @@ export async function fillRohlikCart(
       }
     }
 
-    const estimatedTotal = addedItems.reduce((s, i) => s + i.price, 0);
-    console.log(`Přidáno: ${addedItems.length}/${shoppingList.length}, nenalezeno: ${notFoundItems.length}`);
+    // ── FÁZE 4: Ověření košíku ──
+    await sleep(1500); // chvíli počkej než se košík aktualizuje
+    let verifiedTotal = 0;
+    let verifiedCount = 0;
+    try {
+      const cartResult = await mcpClient.callTool({ name: "get_cart", arguments: {} });
+      const cartData = JSON.parse((cartResult.content as { type: string; text: string }[])[0].text);
+      const cartItems = cartData?.data?.items ?? {};
+      verifiedCount = Object.keys(cartItems).length;
+      verifiedTotal = cartData?.data?.totalPrice ?? 0;
+      console.log(`Ověření košíku: ${verifiedCount} produktů, celkem ${verifiedTotal} Kč`);
+
+      if (verifiedCount === 0 && toAdd.length > 0) {
+        throw new Error(
+          "Košík je prázdný — položky se nepodařilo přidat. Zkontrolujte přihlašovací údaje k Rohlík.cz v Nastavení."
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Košík je prázdný")) throw err;
+      console.warn("Ověření košíku selhalo:", msg);
+    }
+
+    const estimatedTotal = verifiedTotal > 0
+      ? verifiedTotal
+      : addedItems.reduce((s, i) => s + i.price, 0);
+
+    console.log(`Přidáno: ${addedItems.length}/${shoppingList.length}, ověřeno v košíku: ${verifiedCount}`);
 
     return { addedItems, notFoundItems, estimatedTotal, cartUrl: "https://www.rohlik.cz" };
   } finally {
