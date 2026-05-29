@@ -80,6 +80,15 @@ export async function fillRohlikCart(
   const mcpClient = await createRohlikClient(rohlikEmail, rohlikPassword);
 
   try {
+    // ── FÁZE 0: Vyčisti košík ──
+    try {
+      await mcpClient.callTool({ name: "clear_cart", arguments: {} });
+      console.log("Košík vyčištěn");
+      await sleep(1000);
+    } catch (e) {
+      console.warn("clear_cart selhalo:", String(e).slice(0, 100));
+    }
+
     // ── FÁZE 1: Paralelní vyhledávání (skupiny po 3 dávky najednou) ──
     const batches = chunk(shoppingList, 4); // 4 položky per dávka
     const allResults: Record<string, RohlikProduct[]> = {};
@@ -152,12 +161,17 @@ export async function fillRohlikCart(
       // Přidej ve skupinách po 20 (Rohlik limit)
       const addChunks = chunk(toAdd, 20);
       for (let i = 0; i < addChunks.length; i++) {
+        let added = false;
         for (let attempt = 0; attempt < 4; attempt++) {
           try {
-            await mcpClient.callTool({ name: "add_items_to_cart", arguments: { items: addChunks[i] } });
+            const res = await mcpClient.callTool({ name: "add_items_to_cart", arguments: { items: addChunks[i] } });
+            const resData = JSON.parse((res.content as { type: string; text: string }[])[0].text);
+            console.log(`Chunk ${i + 1}: success=${resData.success}, failed=${JSON.stringify(resData.items_failed_to_add ?? [])}`);
+            added = true;
             break;
           } catch (err) {
             const msg = String(err);
+            console.error(`add_to_cart chunk ${i + 1} attempt ${attempt + 1} failed:`, msg.slice(0, 150));
             if ((msg.includes("1015") || msg.includes("rate_limit")) && attempt < 3) {
               await sleep((attempt + 1) * 35000);
               continue;
@@ -165,12 +179,13 @@ export async function fillRohlikCart(
             break;
           }
         }
+        if (!added) console.error(`Chunk ${i + 1} se nepodařilo přidat ani po 4 pokusech`);
         if (i < addChunks.length - 1) await sleep(3000);
       }
     }
 
     // ── FÁZE 4: Ověření košíku ──
-    await sleep(1500); // chvíli počkej než se košík aktualizuje
+    await sleep(2000);
     let verifiedTotal = 0;
     let verifiedCount = 0;
     try {
@@ -181,15 +196,27 @@ export async function fillRohlikCart(
       verifiedTotal = cartData?.data?.totalPrice ?? 0;
       console.log(`Ověření košíku: ${verifiedCount} produktů, celkem ${verifiedTotal} Kč`);
 
-      if (verifiedCount === 0 && toAdd.length > 0) {
+      if (verifiedCount === 0) {
         throw new Error(
-          "Košík je prázdný — položky se nepodařilo přidat. Zkontrolujte přihlašovací údaje k Rohlík.cz v Nastavení."
+          "Košík je prázdný — položky se nepodařilo přidat na Rohlík.cz. Zkontrolujte přihlašovací údaje v Nastavení."
+        );
+      }
+
+      // Zkontroluj jestli jsou v košíku naše produkty (alespoň polovina)
+      const cartProductIds = new Set(Object.keys(cartItems).map(Number));
+      const ourProductIds = toAdd.map((t) => t.productId);
+      const matched = ourProductIds.filter((id) => cartProductIds.has(id)).length;
+      console.log(`Shoda produktů: ${matched}/${ourProductIds.length}`);
+
+      if (matched === 0 && ourProductIds.length > 0) {
+        throw new Error(
+          "Košík neobsahuje žádné z požadovaných položek. Zkuste to znovu nebo zkontrolujte přihlašovací údaje."
         );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes("Košík je prázdný")) throw err;
-      console.warn("Ověření košíku selhalo:", msg);
+      if (msg.includes("Košík je prázdný") || msg.includes("neobsahuje")) throw err;
+      console.warn("Ověření košíku selhalo:", msg.slice(0, 100));
     }
 
     const estimatedTotal = verifiedTotal > 0
