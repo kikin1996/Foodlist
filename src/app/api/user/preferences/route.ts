@@ -18,6 +18,8 @@ const schema = z.object({
   allergies: z.string().optional(),
   cuisinePreferences: z.string().optional(),
   dislikedIngredients: z.string().optional(),
+  includedMeals: z.string().optional(),
+  includedDays: z.string().optional(),
   rohlikEmail: z.string().optional(),
   rohlikPassword: z.string().optional(),
 });

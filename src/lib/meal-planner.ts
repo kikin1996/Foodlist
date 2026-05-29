@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { UserPreferences } from "@prisma/client";
+import type { CatalogProduct } from "./rohlik-catalog";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -31,7 +32,7 @@ export interface WeeklyMealPlan {
   shoppingList: ShoppingItem[];
 }
 
-function buildSystemPrompt(prefs: UserPreferences): string {
+function buildSystemPrompt(prefs: UserPreferences, catalog?: CatalogProduct[]): string {
   const diets: string[] = [];
   if (prefs.isVegetarian) diets.push("vegetariánská");
   if (prefs.isVegan) diets.push("veganská");
@@ -63,16 +64,17 @@ ${allergies}
 
 PRAVIDLA:
 - Recept musí být realistický pro vaření doma
-- Ingredience musí být dostupné na Rohlík.cz
 - Respektuj rozpočet (${prefs.weeklyBudget} Kč na ${prefs.householdSize} osob)
 - Jídla musí být rozmanitá, žádné opakování
 - České názvy ingrediencí
 - Nákupní seznam musí být přesný s množstvím
+${catalog && catalog.length > 0 ? `- POUŽÍVEJ POUZE ingredience z tohoto seznamu dostupných produktů na Rohlík.cz:
+${catalog.map((p) => `  ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}` : "- Ingredience musí být dostupné na Rohlík.cz"}
 
 Odpovídej POUZE validním JSON, žádný jiný text.`;
 }
 
-export async function generateMealPlan(prefs: UserPreferences): Promise<WeeklyMealPlan> {
+export async function generateMealPlan(prefs: UserPreferences, catalog?: CatalogProduct[]): Promise<WeeklyMealPlan> {
   const allDays = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
   const days = prefs.includedDays
     ? prefs.includedDays.split(",").filter((d) => allDays.includes(d))
@@ -82,9 +84,9 @@ export async function generateMealPlan(prefs: UserPreferences): Promise<WeeklyMe
     : ["breakfast", "lunch", "dinner"];
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 16000,
-    system: buildSystemPrompt(prefs),
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 8000,
+    system: buildSystemPrompt(prefs, catalog),
     messages: [
       {
         role: "user",
