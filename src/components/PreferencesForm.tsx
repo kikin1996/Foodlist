@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const DAYS = [
+const DELIVERY_DAYS = [
   { value: "monday", label: "Pondělí" },
   { value: "tuesday", label: "Úterý" },
   { value: "wednesday", label: "Středa" },
@@ -11,6 +11,22 @@ const DAYS = [
   { value: "friday", label: "Pátek" },
   { value: "saturday", label: "Sobota" },
   { value: "sunday", label: "Neděle" },
+];
+
+const PLAN_DAYS = [
+  { value: "pondeli", label: "Po" },
+  { value: "utery", label: "Út" },
+  { value: "streda", label: "St" },
+  { value: "ctvrtek", label: "Čt" },
+  { value: "patek", label: "Pá" },
+  { value: "sobota", label: "So" },
+  { value: "nedele", label: "Ne" },
+];
+
+const MEALS = [
+  { value: "breakfast", label: "🌅 Snídaně" },
+  { value: "lunch", label: "🍽️ Oběd" },
+  { value: "dinner", label: "🌙 Večeře" },
 ];
 
 const CUISINES = ["česká", "italská", "asijská", "mexická", "středomořská", "americká"];
@@ -31,6 +47,8 @@ interface Props {
     cuisinePreferences: string;
     dislikedIngredients: string;
     rohlikEmail: string;
+    includedMeals: string;
+    includedDays: string;
   };
 }
 
@@ -45,8 +63,32 @@ export default function PreferencesForm({ initialData }: Props) {
     cuisinePreferences: initialData.cuisinePreferences
       ? initialData.cuisinePreferences.split(",").filter(Boolean)
       : [] as string[],
+    includedMeals: initialData.includedMeals
+      ? initialData.includedMeals.split(",").filter(Boolean)
+      : ["breakfast", "lunch", "dinner"],
+    includedDays: initialData.includedDays
+      ? initialData.includedDays.split(",").filter(Boolean)
+      : ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"],
     rohlikPassword: "",
   });
+
+  function toggleMeal(m: string) {
+    setForm((p) => ({
+      ...p,
+      includedMeals: p.includedMeals.includes(m)
+        ? p.includedMeals.filter((x) => x !== m)
+        : [...p.includedMeals, m],
+    }));
+  }
+
+  function togglePlanDay(d: string) {
+    setForm((p) => ({
+      ...p,
+      includedDays: p.includedDays.includes(d)
+        ? p.includedDays.filter((x) => x !== d)
+        : [...p.includedDays, d],
+    }));
+  }
 
   function toggleCuisine(c: string) {
     setForm((p) => ({
@@ -68,6 +110,8 @@ export default function PreferencesForm({ initialData }: Props) {
         body: JSON.stringify({
           ...form,
           cuisinePreferences: form.cuisinePreferences.join(","),
+          includedMeals: form.includedMeals.join(","),
+          includedDays: form.includedDays.join(","),
         }),
       });
       if (!res.ok) throw new Error("Uložení selhalo");
@@ -137,7 +181,7 @@ export default function PreferencesForm({ initialData }: Props) {
               onChange={(e) => setForm({ ...form, deliveryDay: e.target.value })}
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              {DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              {DELIVERY_DAYS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
             </select>
           </div>
           <div>
@@ -179,6 +223,46 @@ export default function PreferencesForm({ initialData }: Props) {
                 />
                 <span className="text-sm font-medium text-gray-700">{d.label}</span>
               </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Které chody chceš plánovat</label>
+          <div className="flex gap-3">
+            {MEALS.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => toggleMeal(m.value)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  form.includedMeals.includes(m.value)
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Které dny plánovat</label>
+          <div className="flex gap-2">
+            {PLAN_DAYS.map((d) => (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => togglePlanDay(d.value)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  form.includedDays.includes(d.value)
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "border-gray-200 text-gray-500 hover:border-gray-300"
+                }`}
+              >
+                {d.label}
+              </button>
             ))}
           </div>
         </div>

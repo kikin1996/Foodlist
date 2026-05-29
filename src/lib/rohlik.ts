@@ -17,7 +17,6 @@ interface RohlikProduct {
   productId: number;
   productName: string;
   price: number;
-  pricePerUnit?: { full: number };
   textualAmount?: string;
   inStock: boolean;
 }
@@ -35,96 +34,41 @@ async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// Rozdělí pole na dávky
 function chunk<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
   return chunks;
 }
 
-// Vyhledá dávku položek přes MCP s retry na Cloudflare rate limit
-async function searchBatch(client: Client, keywords: string[]): Promise<Record<string, RohlikProduct[]>> {
-  const queries = keywords.map((k) => ({ keyword: k }));
-
-  for (let attempt = 0; attempt < 5; attempt++) {
+// Vyhledá jednu dávku s retry
+async function searchBatch(
+  client: Client,
+  keywords: string[]
+): Promise<Record<string, RohlikProduct[]>> {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
+      const queries = keywords.map((k) => ({ keyword: k }));
       const result = await client.callTool({ name: "batch_search_products", arguments: { queries } });
       const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
       const map: Record<string, RohlikProduct[]> = {};
       for (const r of data.results ?? []) {
-        map[r.query.keyword] = (r.products ?? []).filter((p: RohlikProduct) => p.inStock).slice(0, 5);
+        map[r.query.keyword] = (r.products ?? [])
+          .filter((p: RohlikProduct) => p.inStock)
+          .slice(0, 3);
       }
       return map;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isRateLimit = msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429");
-      if (isRateLimit && attempt < 4) {
-        const wait = (attempt + 1) * 35000; // 35s, 70s, 105s, 140s
-        console.log(`Cloudflare rate limit, čekám ${wait / 1000}s (pokus ${attempt + 1}/5)...`);
-        await sleep(wait);
+      const msg = String(err);
+      if ((msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429")) && attempt < 3) {
+        console.log(`Rate limit, čekám ${(attempt + 1) * 35}s...`);
+        await sleep((attempt + 1) * 35000);
         continue;
       }
-      throw err;
+      console.error("Search batch error:", msg.slice(0, 100));
+      return {};
     }
   }
   return {};
-}
-
-// Přidá do košíku s retry
-async function addToCartWithRetry(client: Client, items: { productId: number; quantity: number }[]) {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      const result = await client.callTool({ name: "add_items_to_cart", arguments: { items } });
-      return JSON.parse((result.content as { type: string; text: string }[])[0].text);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      const isRateLimit = msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429");
-      if (isRateLimit && attempt < 4) {
-        const wait = (attempt + 1) * 35000;
-        console.log(`Cloudflare rate limit (add_to_cart), čekám ${wait / 1000}s...`);
-        await sleep(wait);
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
-// Claude vybere nejlepší produkt z výsledků (jedna call pro celou dávku)
-async function selectBestProducts(
-  items: ShoppingItem[],
-  searchResults: Record<string, RohlikProduct[]>,
-  householdSize: number
-): Promise<{ item: ShoppingItem; product: RohlikProduct | null }[]> {
-  const prompt = items.map((item) => {
-    const results = searchResults[item.name] ?? [];
-    if (results.length === 0) return `"${item.name}": NENALEZENO`;
-    const opts = results.map((p, i) => `  ${i}: id=${p.productId} "${p.productName}" ${p.price}Kč ${p.textualAmount ?? ""}`).join("\n");
-    return `"${item.name}" (potřeba: ${item.amount}${item.unit} pro ${householdSize} osob):\n${opts}`;
-  }).join("\n\n");
-
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    messages: [{
-      role: "user",
-      content: `Pro každou položku vyber nejlepší produkt (správná gramáž, rozumná cena). Vrať POUZE JSON pole:\n[{"name":"název položky","productId":123}]\nPokud nenalezeno, použij productId: null.\n\n${prompt}`,
-    }],
-  });
-
-  const text = (response.content[0] as Anthropic.TextBlock).text;
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return items.map((item) => ({ item, product: null }));
-
-  const selections: { name: string; productId: number | null }[] = JSON.parse(match[0]);
-
-  return items.map((item) => {
-    const sel = selections.find((s) => s.name === item.name);
-    if (!sel?.productId) return { item, product: null };
-    const allProducts = Object.values(searchResults).flat();
-    const product = allProducts.find((p) => p.productId === sel.productId) ?? null;
-    return { item, product };
-  });
 }
 
 export async function fillRohlikCart(
@@ -135,70 +79,100 @@ export async function fillRohlikCart(
 ): Promise<RohlikCartResult> {
   const mcpClient = await createRohlikClient(rohlikEmail, rohlikPassword);
 
-  const addedItems: RohlikCartResult["addedItems"] = [];
-  const notFoundItems: string[] = [];
-
   try {
-    // Zpracuj v dávkách po 4 (limit batch_search_products)
-    const batches = chunk(shoppingList, 4);
-    console.log(`Zpracovávám ${shoppingList.length} položek v ${batches.length} dávkách`);
+    // ── FÁZE 1: Paralelní vyhledávání (skupiny po 3 dávky najednou) ──
+    const batches = chunk(shoppingList, 4); // 4 položky per dávka
+    const allResults: Record<string, RohlikProduct[]> = {};
 
-    for (let bi = 0; bi < batches.length; bi++) {
-      const batch = batches[bi];
-      console.log(`Dávka ${bi + 1}/${batches.length}: ${batch.map((i) => i.name).join(", ")}`);
+    console.log(`Vyhledávám ${shoppingList.length} položek v ${batches.length} dávkách`);
 
-      // 1. Vyhledej přes MCP
-      const searchResults = await searchBatch(mcpClient, batch.map((i) => i.name));
-
-      // 2. Claude vybere nejlepší produkty
-      const selections = await selectBestProducts(batch, searchResults, householdSize);
-
-      // 3. Přidej nalezené do košíku
-      const toAdd = selections.filter((s) => s.product !== null);
-      const notFound = selections.filter((s) => s.product === null);
-
-      notFoundItems.push(...notFound.map((s) => s.item.name));
-
-      if (toAdd.length > 0) {
-        const items = toAdd.map((s) => ({
-          productId: s.product!.productId,
-          quantity: Math.max(1, Math.round(
-            // Odhadni množství podle gramáže
-            s.item.unit === "kg" ? parseFloat(s.item.amount) :
-            s.item.unit === "g" ? parseFloat(s.item.amount) / 1000 : 1
-          )),
-        }));
-
-        const addData = await addToCartWithRetry(mcpClient, items);
-
-        for (const s of toAdd) {
-          const failed = (addData.items_failed_to_add ?? []).includes(String(s.product!.productId));
-          if (failed) {
-            notFoundItems.push(s.item.name);
-          } else {
-            addedItems.push({
-              name: s.item.name,
-              rohlikName: s.product!.productName,
-              price: s.product!.price,
-              amount: s.product!.textualAmount ?? `${s.item.amount}${s.item.unit}`,
-            });
-          }
-        }
-      }
-
-      // Počkej mezi dávkami — Cloudflare limit na mcp.rohlik.cz
-      if (bi < batches.length - 1) await sleep(8000);
+    const batchGroups = chunk(batches, 3); // 3 dávky paralelně = 12 položek najednou
+    for (let gi = 0; gi < batchGroups.length; gi++) {
+      const group = batchGroups[gi];
+      const results = await Promise.all(
+        group.map((batch) => searchBatch(mcpClient, batch.map((i) => i.name)))
+      );
+      results.forEach((r) => Object.assign(allResults, r));
+      console.log(`Skupina ${gi + 1}/${batchGroups.length} hotová`);
+      if (gi < batchGroups.length - 1) await sleep(4000); // 4s mezi skupinami
     }
 
-    const estimatedTotal = addedItems.reduce((sum, i) => sum + i.price, 0);
-    console.log(`Hotovo: přidáno ${addedItems.length}/${shoppingList.length}, nenalezeno ${notFoundItems.length}`);
+    // ── FÁZE 2: Jeden Claude call — výběr nejlepšího produktu pro každou položku ──
+    const itemsWithResults = shoppingList.map((item) => ({
+      item,
+      products: allResults[item.name] ?? [],
+    }));
 
-    return {
-      addedItems,
-      notFoundItems,
-      estimatedTotal,
-      cartUrl: "https://www.rohlik.cz",
-    };
+    const prompt = itemsWithResults.map(({ item, products }) => {
+      if (products.length === 0) return `${item.name}: NENALEZENO`;
+      const opts = products.map((p, i) =>
+        `${i}:id=${p.productId},"${p.productName}",${p.price}Kč,${p.textualAmount ?? ""}`
+      ).join("|");
+      return `${item.name}(${item.amount}${item.unit}):[${opts}]`;
+    }).join("\n");
+
+    const claudeResp = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [{
+        role: "user",
+        content: `Vyber nejlepší produkt pro každou položku (správná gramáž, nejnižší cena). Vrať POUZE JSON:\n[{"n":"název položky","id":123}]\nPro nenalezené použij id:null.\n\n${prompt}`,
+      }],
+    });
+
+    const claudeText = (claudeResp.content[0] as Anthropic.TextBlock).text;
+    const match = claudeText.match(/\[[\s\S]*?\]/);
+    const selections: { n: string; id: number | null }[] = match ? JSON.parse(match[0]) : [];
+
+    // ── FÁZE 3: Jedno hromadné přidání do košíku ──
+    const toAdd: { productId: number; quantity: number }[] = [];
+    const addedItems: RohlikCartResult["addedItems"] = [];
+    const notFoundItems: string[] = [];
+
+    for (const { item, products } of itemsWithResults) {
+      const sel = selections.find((s) => s.n === item.name);
+      if (!sel?.id) { notFoundItems.push(item.name); continue; }
+      const product = products.find((p) => p.productId === sel.id);
+      if (!product) { notFoundItems.push(item.name); continue; }
+
+      const qty = Math.max(1, Math.round(
+        item.unit === "kg" ? parseFloat(item.amount) :
+        item.unit === "g" ? Math.ceil(parseFloat(item.amount) / 500) : 1
+      ));
+      toAdd.push({ productId: product.productId, quantity: qty });
+      addedItems.push({
+        name: item.name,
+        rohlikName: product.productName,
+        price: product.price * qty,
+        amount: product.textualAmount ?? `${item.amount}${item.unit}`,
+      });
+    }
+
+    if (toAdd.length > 0) {
+      // Přidej ve skupinách po 20 (Rohlik limit)
+      const addChunks = chunk(toAdd, 20);
+      for (let i = 0; i < addChunks.length; i++) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          try {
+            await mcpClient.callTool({ name: "add_items_to_cart", arguments: { items: addChunks[i] } });
+            break;
+          } catch (err) {
+            const msg = String(err);
+            if ((msg.includes("1015") || msg.includes("rate_limit")) && attempt < 3) {
+              await sleep((attempt + 1) * 35000);
+              continue;
+            }
+            break;
+          }
+        }
+        if (i < addChunks.length - 1) await sleep(3000);
+      }
+    }
+
+    const estimatedTotal = addedItems.reduce((s, i) => s + i.price, 0);
+    console.log(`Přidáno: ${addedItems.length}/${shoppingList.length}, nenalezeno: ${notFoundItems.length}`);
+
+    return { addedItems, notFoundItems, estimatedTotal, cartUrl: "https://www.rohlik.cz" };
   } finally {
     await mcpClient.close();
   }

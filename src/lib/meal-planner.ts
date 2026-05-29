@@ -73,7 +73,13 @@ Odpovídej POUZE validním JSON, žádný jiný text.`;
 }
 
 export async function generateMealPlan(prefs: UserPreferences): Promise<WeeklyMealPlan> {
-  const days = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
+  const allDays = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
+  const days = prefs.includedDays
+    ? prefs.includedDays.split(",").filter((d) => allDays.includes(d))
+    : allDays;
+  const meals = prefs.includedMeals
+    ? prefs.includedMeals.split(",").filter(Boolean)
+    : ["breakfast", "lunch", "dinner"];
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -82,20 +88,15 @@ export async function generateMealPlan(prefs: UserPreferences): Promise<WeeklyMe
     messages: [
       {
         role: "user",
-        content: `Vytvoř týdenní jídelníček pro dny: ${days.join(", ")}.
+        content: `Vytvoř jídelníček pro dny: ${days.join(", ")}.
+Plánuj pouze tyto chody: ${meals.join(", ")}.
 
 DŮLEŽITÉ: Buď stručný! Maximálně 3 kroky na recept, max 6 ingrediencí na recept.
 
 Vrať POUZE validní JSON (žádný text před ani po):
 {
   "meals": {
-    "pondeli": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "utery": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "streda": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "ctvrtek": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "patek": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "sobota": { "breakfast": "název", "lunch": "název", "dinner": "název" },
-    "nedele": { "breakfast": "název", "lunch": "název", "dinner": "název" }
+${days.map((d) => `    "${d}": { ${meals.map((m) => `"${m}": "název"`).join(", ")} }`).join(",\n")}
   },
   "recipes": {
     "přesný název z meals": {

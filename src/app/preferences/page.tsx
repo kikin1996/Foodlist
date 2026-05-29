@@ -48,6 +48,8 @@ export default async function PreferencesPage() {
             cuisinePreferences: user.preferences?.cuisinePreferences ?? "",
             dislikedIngredients: user.preferences?.dislikedIngredients ?? "",
             rohlikEmail: user.rohlikEmail ?? "",
+            includedMeals: user.preferences?.includedMeals ?? "breakfast,lunch,dinner",
+            includedDays: user.preferences?.includedDays ?? "pondeli,utery,streda,ctvrtek,patek,sobota,nedele",
           }}
         />
       </main>

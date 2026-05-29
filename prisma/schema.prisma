@@ -44,6 +44,9 @@ model UserPreferences {
   cuisinePreferences   String?  // e.g. "italian,asian,czech"
   dislikedIngredients  String?  // e.g. "mushrooms,liver"
 
+  includedMeals        String   @default("breakfast,lunch,dinner") // které chody
+  includedDays         String   @default("pondeli,utery,streda,ctvrtek,patek,sobota,nedele")
+
   autoOrderEnabled     Boolean  @default(false)
 
   createdAt            DateTime @default(now())

@@ -5,6 +5,8 @@ import { decrypt } from "@/lib/encryption";
 import { fillRohlikCart } from "@/lib/rohlik";
 import type { ShoppingItem } from "@/lib/meal-planner";
 
+export const maxDuration = 300; // Vercel Pro: 5 minut timeout
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   if (!user?.rohlikEmail || !user?.rohlikPassEnc) {
     return NextResponse.json(
-      { error: "Nejprve nastavte Rohlík přihlašovací údaje v profilu" },
+      { error: "Nejprve nastavte Rohlík přihlašovací údaje v Nastavení" },
       { status: 400 }
     );
   }
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         mealPlanId: plan.id,
         rohlikCartItems: result.addedItems,
-        rohlikOrderUrl: result.cartUrl ?? "https://www.rohlik.cz",
+        rohlikOrderUrl: "https://www.rohlik.cz",
         estimatedTotal: result.estimatedTotal,
         status: "CART_FILLED",
       },
@@ -65,7 +67,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       orderId: order.id,
-      cartUrl: result.cartUrl,
       estimatedTotal: result.estimatedTotal,
       addedItems: result.addedItems.length,
       notFoundItems: result.notFoundItems,
@@ -73,9 +74,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("Rohlik order error:", msg);
-    return NextResponse.json(
-      { error: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
