@@ -39,6 +39,9 @@ export default async function DashboardPage() {
             <span className="font-bold text-gray-900">Kostki</span>
           </div>
           <nav className="flex items-center gap-6">
+            <Link href="/catalog" className="text-sm text-gray-500 hover:text-gray-900">
+              Katalog potravin
+            </Link>
             <Link href="/preferences" className="text-sm text-gray-500 hover:text-gray-900">
               Nastavení
             </Link>

@@ -44,8 +44,11 @@ model UserPreferences {
   cuisinePreferences   String?  // e.g. "italian,asian,czech"
   dislikedIngredients  String?  // e.g. "mushrooms,liver"
 
-  includedMeals        String   @default("breakfast,lunch,dinner") // které chody
+  includedMeals        String   @default("breakfast,lunch,dinner")
   includedDays         String   @default("pondeli,utery,streda,ctvrtek,patek,sobota,nedele")
+
+  rohlikCatalog        Json?    // cached product catalog from Rohlik
+  catalogUpdatedAt     DateTime?
 
   autoOrderEnabled     Boolean  @default(false)
 

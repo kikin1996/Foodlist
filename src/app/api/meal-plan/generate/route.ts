@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateMealPlan } from "@/lib/meal-planner";
-import { fetchRohlikCatalog } from "@/lib/rohlik-catalog";
+import { fetchRohlikCatalog, isCatalogFresh, type CatalogProduct } from "@/lib/rohlik-catalog";
 import { decrypt } from "@/lib/encryption";
 
 export const maxDuration = 120;
@@ -23,20 +23,38 @@ export async function POST() {
   }
 
   try {
-    // Stáhni dostupné produkty z Rohlíku (pokud má uživatel propojený účet)
-    let catalog = undefined;
+    // ── Katalog z Rohlíku (s cache v DB) ──
+    let catalog: CatalogProduct[] | undefined;
+
     if (user.rohlikEmail && user.rohlikPassEnc) {
-      try {
-        console.log("Stahuji katalog z Rohlíku...");
-        const rohlikPassword = decrypt(user.rohlikPassEnc);
-        catalog = await fetchRohlikCatalog(user.rohlikEmail, rohlikPassword);
-        console.log(`Katalog stažen: ${catalog.length} produktů`);
-      } catch (e) {
-        console.warn("Katalog se nepodařilo stáhnout, generuji bez něj:", e);
+      const prefs = user.preferences;
+
+      if (isCatalogFresh(prefs.catalogUpdatedAt ?? null)) {
+        // Použij cached katalog z DB
+        catalog = (prefs.rohlikCatalog as unknown as CatalogProduct[]) ?? undefined;
+        console.log(`Používám cached katalog: ${catalog?.length ?? 0} produktů`);
+      } else {
+        // Stáhni nový katalog a ulož do DB
+        try {
+          console.log("Stahuji čerstvý katalog z Rohlíku...");
+          const rohlikPassword = decrypt(user.rohlikPassEnc);
+          catalog = await fetchRohlikCatalog(user.rohlikEmail, rohlikPassword);
+          console.log(`Katalog stažen: ${catalog.length} produktů`);
+
+          await prisma.userPreferences.update({
+            where: { userId: session.user.id },
+            data: {
+              rohlikCatalog: catalog as unknown as object[],
+              catalogUpdatedAt: new Date(),
+            },
+          });
+        } catch (e) {
+          console.warn("Katalog se nepodařilo stáhnout:", e);
+        }
       }
     }
 
-    // Načti předchozí jídelníčky aby se neopakovaly
+    // ── Předchozí jídelníčky (zakázaná jídla) ──
     const previousPlans = await prisma.mealPlan.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
@@ -54,7 +72,7 @@ export async function POST() {
       }
     }
 
-    // Generuj jídelníček na základě katalogu, preferencí a předchozích jídel
+    // ── Generuj jídelníček ──
     const weekPlan = await generateMealPlan(user.preferences, catalog, previousMeals);
 
     const weekStart = new Date();
@@ -72,7 +90,10 @@ export async function POST() {
       },
     });
 
-    return NextResponse.json({ id: plan.id });
+    return NextResponse.json({
+      id: plan.id,
+      catalogSize: catalog?.length ?? 0,
+    });
   } catch (err) {
     console.error("Meal plan generation error:", err);
     return NextResponse.json(
