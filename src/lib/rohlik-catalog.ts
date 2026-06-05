@@ -80,45 +80,43 @@ export async function fetchRohlikCatalog(
   const products: CatalogProduct[] = [];
   const batches = chunk(CATEGORIES, 4);
 
-  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů v ${batches.length} dávkách`);
+  console.log(`Stahuji katalog paralelně: ${CATEGORIES.length} dotazů v ${batches.length} dávkách`);
 
+  // Spusť všechny dávky paralelně — žádné čekání mezi nimi
   try {
-    for (let bi = 0; bi < batches.length; bi++) {
-      const batch = batches[bi];
-      try {
+    const batchResults = await Promise.allSettled(
+      batches.map(async (batch) => {
         const result = await client.callTool({
           name: "batch_search_products",
           arguments: { queries: batch.map((q) => ({ keyword: q.keyword })) },
         });
         const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
+        return { batch, data };
+      })
+    );
 
-        for (let i = 0; i < batch.length; i++) {
-          const prods = data.results?.[i]?.products ?? [];
-          const best = prods.filter((p: { inStock: boolean }) => p.inStock).slice(0, 5);
-          for (const p of best) {
-            // Deduplikuj podle productId
-            if (!products.find((x) => x.id === p.productId)) {
-              products.push({
-                id: p.productId,
-                name: p.productName,
-                price: p.price,
-                amount: p.textualAmount ?? "",
-                category: batch[i].cat,
-              });
-            }
+    const seen = new Set<number>();
+    for (const res of batchResults) {
+      if (res.status === "rejected") {
+        console.warn("Dávka selhala:", String(res.reason).slice(0, 60));
+        continue;
+      }
+      const { batch, data } = res.value;
+      for (let i = 0; i < batch.length; i++) {
+        const prods = data.results?.[i]?.products ?? [];
+        for (const p of prods.filter((p: { inStock: boolean }) => p.inStock).slice(0, 5)) {
+          if (!seen.has(p.productId)) {
+            seen.add(p.productId);
+            products.push({
+              id: p.productId,
+              name: p.productName,
+              price: p.price,
+              amount: p.textualAmount ?? "",
+              category: batch[i].cat,
+            });
           }
         }
-      } catch (e) {
-        const msg = String(e);
-        if (msg.includes("1015") || msg.includes("rate_limit")) {
-          console.log(`Rate limit při katalogu dávka ${bi + 1}, čekám 35s...`);
-          await sleep(35000);
-          bi--; // opakuj tuto dávku
-          continue;
-        }
-        console.warn(`Katalog dávka ${bi + 1} selhala:`, msg.slice(0, 80));
       }
-      if (bi < batches.length - 1) await sleep(1500);
     }
   } finally {
     await client.close();
