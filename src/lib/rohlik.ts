@@ -89,28 +89,50 @@ export async function fillRohlikCart(
       console.warn("clear_cart selhalo:", String(e).slice(0, 100));
     }
 
-    // ── FÁZE 1: Paralelní vyhledávání (skupiny po 3 dávky najednou) ──
-    const batches = chunk(shoppingList, 4); // 4 položky per dávka
+    // ── FÁZE 1: Vyhledávání ──
+    // Zjednodušíme názvy pro lepší shodu na Rohlíku
+    function simplifyName(name: string): string {
+      return name
+        .trim()
+        .replace(/\s*\d+\s*(g|kg|ml|l|ks)\s*/gi, "") // odstraň gramáže v názvu
+        .replace(/\s+pro\s+\d+\s*osob.*/i, "")        // odstraň "pro X osob"
+        .replace(/\s+balení.*/i, "")                   // odstraň "balení..."
+        .trim()
+        .split(/\s+/).slice(0, 3).join(" ");            // max 3 slova
+    }
+
+    // Mapa: originalní název → klíč pro vyhledávání
+    const searchKeyMap: Record<string, string> = {};
+    for (const item of shoppingList) {
+      searchKeyMap[item.name] = simplifyName(item.name);
+    }
+
     const allResults: Record<string, RohlikProduct[]> = {};
+    const batches = chunk(shoppingList, 4);
+    console.log(`Vyhledávám ${shoppingList.length} položek (${batches.length} dávek)`);
+    console.log("Klíče:", Object.values(searchKeyMap).join(", "));
 
-    console.log(`Vyhledávám ${shoppingList.length} položek v ${batches.length} dávkách`);
-
-    const batchGroups = chunk(batches, 3); // 3 dávky paralelně = 12 položek najednou
+    const batchGroups = chunk(batches, 3);
     for (let gi = 0; gi < batchGroups.length; gi++) {
       const group = batchGroups[gi];
       const results = await Promise.all(
-        group.map((batch) => searchBatch(mcpClient, batch.map((i) => i.name)))
+        group.map((batch) =>
+          searchBatch(mcpClient, batch.map((i) => searchKeyMap[i.name]))
+        )
       );
       results.forEach((r) => Object.assign(allResults, r));
-      console.log(`Skupina ${gi + 1}/${batchGroups.length} hotová`);
-      if (gi < batchGroups.length - 1) await sleep(4000); // 4s mezi skupinami
+      if (gi < batchGroups.length - 1) await sleep(4000);
     }
 
-    // ── FÁZE 2: Jeden Claude call — výběr nejlepšího produktu pro každou položku ──
-    const itemsWithResults = shoppingList.map((item) => ({
-      item,
-      products: allResults[item.name] ?? [],
-    }));
+    // ── FÁZE 2: Výběr nejlepšího produktu ──
+    const itemsWithResults = shoppingList.map((item) => {
+      const key = searchKeyMap[item.name];
+      const products = allResults[key] ?? [];
+      if (products.length === 0) {
+        console.log(`Nenalezeno: "${item.name}" (hledáno jako "${key}")`);
+      }
+      return { item, products, searchKey: key };
+    });
 
     const prompt = itemsWithResults.map(({ item, products }) => {
       if (products.length === 0) return `${item.name}: NENALEZENO`;
@@ -119,6 +141,8 @@ export async function fillRohlikCart(
       ).join("|");
       return `${item.name}(${item.amount}${item.unit}):[${opts}]`;
     }).join("\n");
+
+    console.log("Prompt pro Claude:\n" + prompt.slice(0, 800));
 
     const claudeResp = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -130,6 +154,7 @@ export async function fillRohlikCart(
     });
 
     const claudeText = (claudeResp.content[0] as Anthropic.TextBlock).text;
+    console.log("Claude výběr:", claudeText.slice(0, 500));
     const match = claudeText.match(/\[[\s\S]*\]/);
     const selections: { n: string; id: number | null }[] = match ? JSON.parse(match[0]) : [];
 
