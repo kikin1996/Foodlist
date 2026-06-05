@@ -108,37 +108,79 @@ export default async function DashboardPage() {
         </div>
 
         {/* Cart filled notification */}
-        {currentOrder?.status === "CART_FILLED" && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 mb-6 flex items-start gap-4">
-            <div className="text-2xl">🛒</div>
-            <div className="flex-1">
-              <div className="font-semibold text-yellow-900">Košík je připravený!</div>
-              <div className="text-sm text-yellow-700 mt-1">
-                Přidali jsme všechny položky do vašeho košíku na Rohlík.cz.
-                Zkontrolujte ho a potvrďte objednávku.
-              </div>
-              <div className="flex gap-3 mt-3">
-                <a
-                  href="https://www.rohlik.cz"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors"
-                >
-                  Otevřít Rohlík.cz
-                </a>
-                <form action="/api/orders/confirm" method="POST">
-                  <input type="hidden" name="orderId" value={currentOrder.id} />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 border border-yellow-300 text-yellow-800 text-sm font-medium rounded-lg hover:bg-yellow-100 transition-colors"
-                  >
-                    Označit jako potvrzeno
-                  </button>
-                </form>
+        {currentOrder?.status === "CART_FILLED" && (() => {
+          const addedCount = Array.isArray(currentOrder.rohlikCartItems)
+            ? (currentOrder.rohlikCartItems as unknown[]).length
+            : 0;
+          const totalCount = Array.isArray(currentPlan?.shoppingList)
+            ? (currentPlan!.shoppingList as unknown[]).length
+            : 0;
+          const allAdded = addedCount >= totalCount && totalCount > 0;
+          const noneAdded = addedCount === 0;
+
+          return (
+            <div className={`rounded-xl p-5 mb-6 flex items-start gap-4 border ${noneAdded ? "bg-red-50 border-red-200" : allAdded ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
+              <div className="text-2xl">{noneAdded ? "❌" : allAdded ? "✅" : "⚠️"}</div>
+              <div className="flex-1">
+                <div className={`font-semibold ${noneAdded ? "text-red-900" : allAdded ? "text-green-900" : "text-yellow-900"}`}>
+                  {noneAdded ? "Košík je prázdný!" : allAdded ? "Košík je připravený!" : "Košík je částečně připravený"}
+                </div>
+
+                {/* Počítadlo položek */}
+                <div className="flex items-center gap-2 mt-2">
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
+                    noneAdded ? "bg-red-100 text-red-800" :
+                    allAdded ? "bg-green-100 text-green-800" :
+                    "bg-yellow-100 text-yellow-800"
+                  }`}>
+                    🛒 {addedCount} / {totalCount} položek v košíku
+                  </div>
+                  {!allAdded && !noneAdded && (
+                    <span className="text-xs text-red-600 font-medium">
+                      ⚠️ {totalCount - addedCount} položek chybí
+                    </span>
+                  )}
+                </div>
+
+                {noneAdded && (
+                  <p className="text-sm text-red-700 mt-1">
+                    Zkontrolujte přihlašovací údaje k Rohlík.cz v Nastavení a zkuste nakoupit znovu.
+                  </p>
+                )}
+                {!noneAdded && !allAdded && (
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Část položek se nepodařilo najít na Rohlíku. Zkontrolujte košík a doplňte ručně.
+                  </p>
+                )}
+
+                {currentOrder.estimatedTotal ? (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Odhadovaná cena: <strong>{Math.round(currentOrder.estimatedTotal).toLocaleString("cs")} Kč</strong>
+                  </p>
+                ) : null}
+
+                {!noneAdded && (
+                  <div className="flex gap-3 mt-3">
+                    <a
+                      href="https://www.rohlik.cz"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${allAdded ? "bg-green-600 hover:bg-green-700" : "bg-yellow-600 hover:bg-yellow-700"}`}
+                    >
+                      Otevřít Rohlík.cz
+                    </a>
+                    <form action="/api/orders/confirm" method="POST">
+                      <input type="hidden" name="orderId" value={currentOrder.id} />
+                      <button type="submit" className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                        Označit jako potvrzeno
+                      </button>
+                    </form>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Meal plan or generate */}
         {currentPlan ? (
