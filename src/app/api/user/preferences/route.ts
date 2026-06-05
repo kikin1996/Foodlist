@@ -20,6 +20,7 @@ const schema = z.object({
   dislikedIngredients: z.string().optional(),
   includedMeals: z.string().optional(),
   includedDays: z.string().optional(),
+  aiModel: z.enum(["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-8"]).optional(),
   rohlikEmail: z.string().optional(),
   rohlikPassword: z.string().optional(),
 });

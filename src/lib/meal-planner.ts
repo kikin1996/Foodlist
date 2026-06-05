@@ -84,7 +84,7 @@ export async function generateMealPlan(prefs: UserPreferences, catalog?: Catalog
     : ["breakfast", "lunch", "dinner"];
 
   const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: (prefs.aiModel ?? "claude-haiku-4-5-20251001") as string,
     max_tokens: 8000,
     system: buildSystemPrompt(prefs, catalog),
     messages: [

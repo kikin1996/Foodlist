@@ -49,6 +49,7 @@ interface Props {
     rohlikEmail: string;
     includedMeals: string;
     includedDays: string;
+    aiModel: string;
   };
 }
 
@@ -265,6 +266,33 @@ export default function PreferencesForm({ initialData }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">AI model pro generování jídelníčku</label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", desc: "Rychlý, levný", badge: "⚡" },
+              { value: "claude-sonnet-4-6", label: "Sonnet 4.6", desc: "Vyvážený", badge: "⚖️" },
+              { value: "claude-opus-4-8", label: "Opus 4.8", desc: "Nejlepší kvalita", badge: "🏆" },
+            ].map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setForm({ ...form, aiModel: m.value })}
+                className={`p-3 rounded-xl border-2 text-left transition-colors ${
+                  form.aiModel === m.value
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="text-xl mb-1">{m.badge}</div>
+                <div className="font-semibold text-gray-900 text-sm">{m.label}</div>
+                <div className="text-xs text-gray-500">{m.desc}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">Opus generuje kreativnější jídelníčky ale je pomalejší (~60s)</p>
         </div>
 
         <div>
