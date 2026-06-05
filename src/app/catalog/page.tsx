@@ -68,7 +68,7 @@ export default async function CatalogPage() {
             <div className="text-5xl mb-4">🛒</div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Katalog není stažen</h2>
             <p className="text-gray-500 text-sm mb-4">
-              Klikněte na tlačítko "Aktualizovat katalog" výše. Katalog se stáhne z Rohlík.cz
+              Klikněte na tlačítko &quot;Aktualizovat katalog&quot; výše. Katalog se stáhne z Rohlík.cz
               a použije se při generování jídelníčku.
             </p>
           </div>
