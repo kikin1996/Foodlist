@@ -13,6 +13,10 @@ export default function RefreshCatalogButton() {
     setError("");
     try {
       const res = await fetch("/api/catalog", { method: "POST" });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server timeout nebo chyba (${res.status}) — zkuste to znovu`);
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Aktualizace selhala");
       router.refresh();

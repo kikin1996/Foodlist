@@ -11,95 +11,48 @@ export interface CatalogProduct {
   category: string;
 }
 
-// Rozsáhlý seznam kategorií — pokrývá většinu typických surovin
+// Klíčové kategorie — optimalizováno pro Vercel 60s timeout (10 batches × 4 = 40 dotazů)
 const CATEGORIES: { keyword: string; cat: string }[] = [
-  // Maso & ryby
   { keyword: "kuřecí prsa", cat: "maso" },
-  { keyword: "kuřecí stehna", cat: "maso" },
   { keyword: "vepřová krkovice", cat: "maso" },
-  { keyword: "vepřová panenka", cat: "maso" },
-  { keyword: "hovězí maso", cat: "maso" },
-  { keyword: "mleté maso vepřové", cat: "maso" },
-  { keyword: "mleté maso hovězí", cat: "maso" },
-  { keyword: "slanina", cat: "maso" },
-  { keyword: "šunka", cat: "maso" },
   { keyword: "losos filet", cat: "maso" },
-  { keyword: "treska filet", cat: "maso" },
-  { keyword: "tuňák konzerva", cat: "maso" },
-  { keyword: "krevety", cat: "maso" },
-  // Mléčné
-  { keyword: "mléko plnotučné", cat: "mlecne" },
-  { keyword: "mléko polotučné", cat: "mlecne" },
-  { keyword: "máslo", cat: "mlecne" },
-  { keyword: "smetana ke šlehání", cat: "mlecne" },
-  { keyword: "smetana na vaření", cat: "mlecne" },
-  { keyword: "jogurt bílý", cat: "mlecne" },
-  { keyword: "jogurt řecký", cat: "mlecne" },
-  { keyword: "eidam", cat: "mlecne" },
-  { keyword: "gouda sýr", cat: "mlecne" },
-  { keyword: "mozzarella", cat: "mlecne" },
-  { keyword: "parmazán", cat: "mlecne" },
-  { keyword: "cottage sýr", cat: "mlecne" },
-  { keyword: "tvaroh měkký", cat: "mlecne" },
+  { keyword: "mleté maso", cat: "maso" },
   { keyword: "vejce", cat: "mlecne" },
-  // Zelenina
+  { keyword: "mléko", cat: "mlecne" },
+  { keyword: "máslo", cat: "mlecne" },
+  { keyword: "jogurt řecký", cat: "mlecne" },
+  { keyword: "eidam sýr", cat: "mlecne" },
+  { keyword: "mozzarella", cat: "mlecne" },
+  { keyword: "smetana na vaření", cat: "mlecne" },
+  { keyword: "tvaroh", cat: "mlecne" },
   { keyword: "rajčata", cat: "zelenina" },
-  { keyword: "paprika červená", cat: "zelenina" },
-  { keyword: "paprika žlutá", cat: "zelenina" },
-  { keyword: "cibule žlutá", cat: "zelenina" },
+  { keyword: "paprika", cat: "zelenina" },
+  { keyword: "cibule", cat: "zelenina" },
   { keyword: "česnek", cat: "zelenina" },
   { keyword: "brambory", cat: "zelenina" },
   { keyword: "mrkev", cat: "zelenina" },
   { keyword: "brokolice", cat: "zelenina" },
   { keyword: "špenát", cat: "zelenina" },
   { keyword: "cuketa", cat: "zelenina" },
-  { keyword: "lilek", cat: "zelenina" },
-  { keyword: "zelí bílé", cat: "zelenina" },
-  { keyword: "ledový salát", cat: "zelenina" },
-  { keyword: "rukola", cat: "zelenina" },
-  { keyword: "okurka salátová", cat: "zelenina" },
-  { keyword: "pórek", cat: "zelenina" },
-  { keyword: "hrášek mražený", cat: "zelenina" },
-  { keyword: "kukuřice konzervovaná", cat: "zelenina" },
-  { keyword: "fazole červené konzerva", cat: "zelenina" },
-  { keyword: "cizrna konzerva", cat: "zelenina" },
-  // Ovoce
+  { keyword: "okurka", cat: "zelenina" },
   { keyword: "banán", cat: "ovoce" },
   { keyword: "jablko", cat: "ovoce" },
   { keyword: "pomeranč", cat: "ovoce" },
   { keyword: "citrón", cat: "ovoce" },
-  { keyword: "jahody", cat: "ovoce" },
-  { keyword: "borůvky", cat: "ovoce" },
-  { keyword: "hruška", cat: "ovoce" },
-  // Pečivo & obiloviny
   { keyword: "chléb celozrnný", cat: "pecivo" },
   { keyword: "toastový chléb", cat: "pecivo" },
   { keyword: "rohlík", cat: "pecivo" },
-  { keyword: "bageta", cat: "pecivo" },
   { keyword: "tortilla wrap", cat: "pecivo" },
-  // Suché potraviny
-  { keyword: "těstoviny špagety", cat: "suche" },
-  { keyword: "těstoviny penne", cat: "suche" },
-  { keyword: "rýže dlouhozrnná", cat: "suche" },
-  { keyword: "rýže basmati", cat: "suche" },
+  { keyword: "těstoviny", cat: "suche" },
+  { keyword: "rýže", cat: "suche" },
   { keyword: "ovesné vločky", cat: "suche" },
-  { keyword: "müsli", cat: "suche" },
-  { keyword: "čočka červená", cat: "suche" },
+  { keyword: "čočka", cat: "suche" },
   { keyword: "kuskus", cat: "suche" },
-  { keyword: "bulgur", cat: "suche" },
-  { keyword: "mouka hladká", cat: "suche" },
-  // Konzervy & omáčky
-  { keyword: "rajčata krájená konzerva", cat: "ostatni" },
+  { keyword: "rajčata konzerva", cat: "ostatni" },
   { keyword: "kokosové mléko", cat: "ostatni" },
-  { keyword: "sójová omáčka", cat: "ostatni" },
   { keyword: "olivový olej", cat: "ostatni" },
-  { keyword: "slunečnicový olej", cat: "ostatni" },
-  { keyword: "hořčice", cat: "ostatni" },
-  { keyword: "kečup", cat: "ostatni" },
-  { keyword: "med", cat: "ostatni" },
-  { keyword: "ocet jablečný", cat: "ostatni" },
+  { keyword: "sójová omáčka", cat: "ostatni" },
   { keyword: "vývar kuřecí", cat: "ostatni" },
-  { keyword: "vývar hovězí", cat: "ostatni" },
 ];
 
 const CATALOG_MAX_AGE_HOURS = 24;
@@ -165,7 +118,7 @@ export async function fetchRohlikCatalog(
         }
         console.warn(`Katalog dávka ${bi + 1} selhala:`, msg.slice(0, 80));
       }
-      if (bi < batches.length - 1) await sleep(3000);
+      if (bi < batches.length - 1) await sleep(1500);
     }
   } finally {
     await client.close();
