@@ -36,8 +36,26 @@ export async function POST() {
       }
     }
 
-    // Generuj jídelníček na základě katalogu a preferencí
-    const weekPlan = await generateMealPlan(user.preferences, catalog);
+    // Načti předchozí jídelníčky aby se neopakovaly
+    const previousPlans = await prisma.mealPlan.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { meals: true },
+    });
+
+    const previousMeals: string[] = [];
+    for (const plan of previousPlans) {
+      const meals = plan.meals as Record<string, Record<string, string>>;
+      for (const day of Object.values(meals)) {
+        for (const meal of Object.values(day)) {
+          if (meal && typeof meal === "string") previousMeals.push(meal);
+        }
+      }
+    }
+
+    // Generuj jídelníček na základě katalogu, preferencí a předchozích jídel
+    const weekPlan = await generateMealPlan(user.preferences, catalog, previousMeals);
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);

@@ -74,7 +74,7 @@ ${catalog.map((p) => `  ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}` : 
 Odpovídej POUZE validním JSON, žádný jiný text.`;
 }
 
-export async function generateMealPlan(prefs: UserPreferences, catalog?: CatalogProduct[]): Promise<WeeklyMealPlan> {
+export async function generateMealPlan(prefs: UserPreferences, catalog?: CatalogProduct[], previousMeals?: string[]): Promise<WeeklyMealPlan> {
   const allDays = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
   const days = prefs.includedDays
     ? prefs.includedDays.split(",").filter((d) => allDays.includes(d))
@@ -92,6 +92,12 @@ export async function generateMealPlan(prefs: UserPreferences, catalog?: Catalog
         role: "user",
         content: `Vytvoř jídelníček pro dny: ${days.join(", ")}.
 Plánuj pouze tyto chody: ${meals.join(", ")}.
+
+NÁHODNOST: Dnešní seed: ${Date.now()}. Buď kreativní a vygeneruj ZCELA ODLIŠNÁ jídla od minulých.
+${previousMeals && previousMeals.length > 0
+  ? `ZAKÁZANÁ JÍDLA (tato jídla NESMÍ být v jídelníčku, použij jiné):
+${[...new Set(previousMeals)].slice(0, 30).map((m) => `- ${m}`).join("\n")}`
+  : ""}
 
 DŮLEŽITÉ: Buď stručný! Maximálně 3 kroky na recept, max 6 ingrediencí na recept.
 
