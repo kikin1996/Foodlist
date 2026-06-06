@@ -11,12 +11,18 @@ export interface CatalogProduct {
   category: string;
 }
 
-// Klíčové kategorie — optimalizováno pro Vercel 60s timeout (10 batches × 4 = 40 dotazů)
+// Kategorie — optimalizováno pro Vercel 60s timeout (16 batches × 4 = 64 dotazů)
 const CATEGORIES: { keyword: string; cat: string }[] = [
+  // Maso & ryby
   { keyword: "kuřecí prsa", cat: "maso" },
   { keyword: "vepřová krkovice", cat: "maso" },
   { keyword: "losos filet", cat: "maso" },
-  { keyword: "mleté maso", cat: "maso" },
+  { keyword: "mleté maso hovězí", cat: "maso" },
+  { keyword: "kuřecí stehno", cat: "maso" },
+  { keyword: "vepřová panenka", cat: "maso" },
+  { keyword: "treska filet", cat: "maso" },
+  { keyword: "slanina", cat: "maso" },
+  // Mléčné
   { keyword: "vejce", cat: "mlecne" },
   { keyword: "mléko", cat: "mlecne" },
   { keyword: "máslo", cat: "mlecne" },
@@ -25,8 +31,9 @@ const CATEGORIES: { keyword: string; cat: string }[] = [
   { keyword: "mozzarella", cat: "mlecne" },
   { keyword: "smetana na vaření", cat: "mlecne" },
   { keyword: "tvaroh", cat: "mlecne" },
+  // Zelenina
   { keyword: "rajčata", cat: "zelenina" },
-  { keyword: "paprika", cat: "zelenina" },
+  { keyword: "paprika červená", cat: "zelenina" },
   { keyword: "cibule", cat: "zelenina" },
   { keyword: "česnek", cat: "zelenina" },
   { keyword: "brambory", cat: "zelenina" },
@@ -35,24 +42,44 @@ const CATEGORIES: { keyword: string; cat: string }[] = [
   { keyword: "špenát", cat: "zelenina" },
   { keyword: "cuketa", cat: "zelenina" },
   { keyword: "okurka", cat: "zelenina" },
+  { keyword: "lilek", cat: "zelenina" },
+  { keyword: "pórek", cat: "zelenina" },
+  // Ovoce
   { keyword: "banán", cat: "ovoce" },
   { keyword: "jablko", cat: "ovoce" },
   { keyword: "pomeranč", cat: "ovoce" },
   { keyword: "citrón", cat: "ovoce" },
+  { keyword: "jahody", cat: "ovoce" },
+  { keyword: "borůvky", cat: "ovoce" },
+  // Pečivo
   { keyword: "chléb celozrnný", cat: "pecivo" },
   { keyword: "toastový chléb", cat: "pecivo" },
   { keyword: "rohlík", cat: "pecivo" },
   { keyword: "tortilla wrap", cat: "pecivo" },
-  { keyword: "těstoviny", cat: "suche" },
-  { keyword: "rýže", cat: "suche" },
+  // Suché potraviny
+  { keyword: "těstoviny špagety", cat: "suche" },
+  { keyword: "rýže jasmínová", cat: "suche" },
   { keyword: "ovesné vločky", cat: "suche" },
-  { keyword: "čočka", cat: "suche" },
+  { keyword: "čočka červená", cat: "suche" },
   { keyword: "kuskus", cat: "suche" },
+  { keyword: "quinoa", cat: "suche" },
+  { keyword: "cizrna konzerva", cat: "suche" },
+  { keyword: "fazole konzerva", cat: "suche" },
+  // Ostatní (oleje, omáčky, konzervy)
   { keyword: "rajčata konzerva", cat: "ostatni" },
   { keyword: "kokosové mléko", cat: "ostatni" },
   { keyword: "olivový olej", cat: "ostatni" },
   { keyword: "sójová omáčka", cat: "ostatni" },
   { keyword: "vývar kuřecí", cat: "ostatni" },
+  { keyword: "pesto bazalkové", cat: "ostatni" },
+  { keyword: "med", cat: "ostatni" },
+  { keyword: "hořčice", cat: "ostatni" },
+  // Nápoje & pivo
+  { keyword: "pivo Stella", cat: "napoje" },
+  { keyword: "pivo ležák", cat: "napoje" },
+  { keyword: "pivo nealkoholické", cat: "napoje" },
+  { keyword: "džus pomerančový", cat: "napoje" },
+  { keyword: "minerální voda", cat: "napoje" },
 ];
 
 const CATALOG_MAX_AGE_HOURS = 24;
@@ -104,7 +131,7 @@ export async function fetchRohlikCatalog(
       const { batch, data } = res.value;
       for (let i = 0; i < batch.length; i++) {
         const prods = data.results?.[i]?.products ?? [];
-        for (const p of prods.filter((p: { inStock: boolean }) => p.inStock).slice(0, 5)) {
+        for (const p of prods.filter((p: { inStock: boolean }) => p.inStock).slice(0, 6)) {
           if (!seen.has(p.productId)) {
             seen.add(p.productId);
             products.push({

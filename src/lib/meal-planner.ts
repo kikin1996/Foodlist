@@ -32,7 +32,7 @@ export interface WeeklyMealPlan {
   shoppingList: ShoppingItem[];
 }
 
-function buildSystemPrompt(prefs: UserPreferences, catalog?: CatalogProduct[]): string {
+function buildSystemPrompt(prefs: UserPreferences, catalog?: CatalogProduct[], previousMeals?: string[]): string {
   const diets: string[] = [];
   if (prefs.isVegetarian) diets.push("vegetariánská");
   if (prefs.isVegan) diets.push("veganská");
@@ -65,11 +65,16 @@ ${allergies}
 PRAVIDLA:
 - Recept musí být realistický pro vaření doma
 - Respektuj rozpočet (${prefs.weeklyBudget} Kč na ${prefs.householdSize} osob)
-- Jídla musí být rozmanitá, žádné opakování
+- Jídla musí být MAXIMÁLNĚ ROZMANITÁ — každé jídlo musí být zcela jiné (jiný typ masa, jiná příloha, jiný způsob přípravy)
 - České názvy ingrediencí
 - Nákupní seznam musí být přesný s množstvím
-${catalog && catalog.length > 0 ? `- POUŽÍVEJ POUZE ingredience z tohoto seznamu dostupných produktů na Rohlík.cz:
+${catalog && catalog.length > 0 ? `- INSPIRUJ SE těmito dostupnými produkty na Rohlík.cz (nemusíš použít jen tyto — jde o inspiraci):
 ${catalog.map((p) => `  ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}` : "- Ingredience musí být dostupné na Rohlík.cz"}
+
+${previousMeals && previousMeals.length > 0 ? `
+⛔ PŘÍSNÝ ZÁKAZ — TATO JÍDLA NESMÍŠ NIKDY POUŽÍT (jsou z předchozích jídelníčků):
+${[...new Set(previousMeals)].slice(0, 40).map((m) => `  ❌ ${m}`).join("\n")}
+Pokud by ses chystal použít tato jídla nebo jejich velmi podobnou variantu, VYMYSLI NĚCO ZCELA JINÉHO.` : ""}
 
 Odpovídej POUZE validním JSON, žádný jiný text.`;
 }
@@ -86,18 +91,15 @@ export async function generateMealPlan(prefs: UserPreferences, catalog?: Catalog
   const response = await client.messages.create({
     model: (prefs.aiModel ?? "claude-haiku-4-5-20251001") as string,
     max_tokens: 8000,
-    system: buildSystemPrompt(prefs, catalog),
+    system: buildSystemPrompt(prefs, catalog, previousMeals),
     messages: [
       {
         role: "user",
-        content: `Vytvoř jídelníček pro dny: ${days.join(", ")}.
+        content: `Vytvoř ZCELA NOVÝ a ORIGINÁLNÍ jídelníček pro dny: ${days.join(", ")}.
 Plánuj pouze tyto chody: ${meals.join(", ")}.
 
-NÁHODNOST: Dnešní seed: ${Date.now()}. Buď kreativní a vygeneruj ZCELA ODLIŠNÁ jídla od minulých.
-${previousMeals && previousMeals.length > 0
-  ? `ZAKÁZANÁ JÍDLA (tato jídla NESMÍ být v jídelníčku, použij jiné):
-${[...new Set(previousMeals)].slice(0, 30).map((m) => `- ${m}`).join("\n")}`
-  : ""}
+NÁHODNÝ SEED: ${Date.now()} — použij k vygenerování NAPROSTO ODLIŠNÝCH jídel než kdy dřív.
+Mysli kreativně — zkus různé světové kuchyně, různé způsoby přípravy, různé proteiny.
 
 DŮLEŽITÉ: Buď stručný! Maximálně 3 kroky na recept, max 6 ingrediencí na recept.
 
