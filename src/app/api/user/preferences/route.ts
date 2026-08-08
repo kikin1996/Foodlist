@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/encryption";
+import { verifyRohlikCredentials } from "@/lib/rohlik";
 import { z } from "zod";
+
+export const maxDuration = 60;
 
 const schema = z.object({
   healthLevel: z.number().int().min(1).max(10),
@@ -36,6 +39,14 @@ export async function POST(req: NextRequest) {
     const data = schema.parse(body);
 
     const { rohlikEmail, rohlikPassword, ...prefsData } = data;
+
+    // Ověř Rohlík přihlášení hned při uložení — ať uživatel ví, jestli funguje
+    if (rohlikEmail && rohlikPassword) {
+      const credError = await verifyRohlikCredentials(rohlikEmail, rohlikPassword);
+      if (credError) {
+        return NextResponse.json({ error: credError }, { status: 400 });
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.userPreferences.upsert({

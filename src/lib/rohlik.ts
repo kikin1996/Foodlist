@@ -30,6 +30,30 @@ async function createRohlikClient(email: string, password: string): Promise<Clie
   return client;
 }
 
+export function isRohlikAuthError(err: unknown): boolean {
+  const msg = String(err);
+  return msg.includes("Login request failed") || msg.includes("401") || msg.includes("Unauthorized");
+}
+
+/** Ověří Rohlík přihlašovací údaje — vrátí null při úspěchu, jinak text chyby. */
+export async function verifyRohlikCredentials(email: string, password: string): Promise<string | null> {
+  let client: Client | null = null;
+  try {
+    client = await createRohlikClient(email, password);
+    const r = await client.callTool({ name: "get_user_info", arguments: {} });
+    const text = (r.content as { type: string; text: string }[])[0]?.text ?? "";
+    if (text.includes("Login request failed") || text.includes("Unauthorized")) {
+      return "Rohlík odmítl přihlášení — zkontrolujte email a heslo.";
+    }
+    return null;
+  } catch (err) {
+    if (isRohlikAuthError(err)) return "Rohlík odmítl přihlášení — zkontrolujte email a heslo.";
+    return `Rohlík je dočasně nedostupný (${String(err).slice(0, 80)})`;
+  } finally {
+    await client?.close().catch(() => {});
+  }
+}
+
 async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -80,7 +104,22 @@ export async function fillRohlikCart(
   const mcpClient = await createRohlikClient(rohlikEmail, rohlikPassword);
 
   try {
-    // ── FÁZE 0: Vyčisti košík ──
+    // ── FÁZE 0: Ověř přihlášení a vyčisti košík ──
+    // MCP vrací chyby jako text v odpovědi, ne jako výjimku — kontrolujeme obojí
+    try {
+      const authCheck = await mcpClient.callTool({ name: "get_user_info", arguments: {} });
+      const authText = (authCheck.content as { type: string; text: string }[])[0]?.text ?? "";
+      if (authText.includes("Login request failed") || authText.includes("Unauthorized")) {
+        throw new Error("Rohlík odmítl přihlášení — zkontrolujte email a heslo v Nastavení.");
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Rohlík odmítl")) throw e;
+      if (isRohlikAuthError(e)) {
+        throw new Error("Rohlík odmítl přihlášení — zkontrolujte email a heslo v Nastavení.");
+      }
+      console.warn("Ověření přihlášení selhalo:", String(e).slice(0, 100));
+    }
+
     try {
       await mcpClient.callTool({ name: "clear_cart", arguments: {} });
       console.log("Košík vyčištěn");

@@ -115,7 +115,10 @@ export default function PreferencesForm({ initialData }: Props) {
           includedDays: form.includedDays.join(","),
         }),
       });
-      if (!res.ok) throw new Error("Uložení selhalo");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Uložení selhalo");
+      }
       setSaved(true);
       router.refresh();
     } catch (err) {
