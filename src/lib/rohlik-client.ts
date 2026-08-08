@@ -33,7 +33,9 @@ export class RohlikClient {
     if (!res.ok || data?.status !== 200 || !data?.data?.user) {
       throw new RohlikAuthError("Rohlík odmítl přihlášení — zkontrolujte email a heslo v Nastavení.");
     }
-    this.cookie = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+    const setCookies = res.headers.getSetCookie();
+    this.cookie = setCookies.map((c) => c.split(";")[0]).join("; ");
+    console.log(`Rohlík login OK, Set-Cookie count=${setCookies.length}, cookie length=${this.cookie.length}`);
     if (!this.cookie) {
       throw new Error("Rohlík login OK, ale nepřišla session cookie — zkuste to znovu.");
     }
@@ -73,12 +75,26 @@ export class RohlikClient {
       headers: this.headers(),
       body: JSON.stringify({ productId, quantity }),
     });
-    return res.ok;
+    const text = await res.text();
+    let data: { status?: number } | null = null;
+    try { data = JSON.parse(text); } catch { /* not JSON */ }
+    const ok = res.ok && data?.status === 200;
+    if (!ok) {
+      console.warn(
+        `addToCart(${productId}) FAIL — HTTP ${res.status}, content-type=${res.headers.get("content-type")}, body: ${text.slice(0, 300)}`
+      );
+    }
+    return ok;
   }
 
   async getCart(): Promise<{ items: Record<string, unknown>; totalPrice: number }> {
     const res = await fetch(`${BASE}/v2/cart`, { headers: this.headers() });
-    const data = (await res.json().catch(() => null)) as { data?: { items?: Record<string, unknown>; totalPrice?: number } } | null;
+    const text = await res.text();
+    let data: { data?: { items?: Record<string, unknown>; totalPrice?: number } } | null = null;
+    try { data = JSON.parse(text); } catch { /* not JSON */ }
+    if (!res.ok || !data) {
+      console.warn(`getCart FAIL — HTTP ${res.status}, body: ${text.slice(0, 300)}`);
+    }
     return { items: data?.data?.items ?? {}, totalPrice: data?.data?.totalPrice ?? 0 };
   }
 }
