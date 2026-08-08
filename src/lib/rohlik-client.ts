@@ -1,4 +1,11 @@
 // Přímý klient na veřejné Rohlík API (www.rohlik.cz) — nahrazuje nespolehlivý mcp.rohlik.cz.
+//
+// Používá undici napřímo, ne globální `fetch` — Next.js si globální fetch v Route
+// Handlerech patchuje pro svůj Data Cache a v této obálce se ztrácely opakované
+// Set-Cookie hlavičky (getSetCookie() vracelo prázdno), takže se session cookie
+// nikdy neuložila a každý další request (add/get cart) běžel jako anonymní
+// bez přihlášení — proto košík po objednávce vypadal prázdný i po úspěšném loginu.
+import { fetch } from "undici";
 
 const BASE = "https://www.rohlik.cz/services/frontend-service";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
@@ -22,11 +29,14 @@ export class RohlikClient {
       headers: { "Content-Type": "application/json", "User-Agent": UA },
       body: JSON.stringify({ email, password }),
     });
-    const data = await res.json().catch(() => null);
+    const data = (await res.json().catch(() => null)) as { status?: number; data?: { user?: unknown } } | null;
     if (!res.ok || data?.status !== 200 || !data?.data?.user) {
       throw new RohlikAuthError("Rohlík odmítl přihlášení — zkontrolujte email a heslo v Nastavení.");
     }
     this.cookie = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+    if (!this.cookie) {
+      throw new Error("Rohlík login OK, ale nepřišla session cookie — zkuste to znovu.");
+    }
   }
 
   private headers(): Record<string, string> {
@@ -39,11 +49,12 @@ export class RohlikClient {
       { headers: this.headers() }
     );
     if (!res.ok) return [];
-    const data = await res.json().catch(() => null);
+    type SearchProduct = { productId: number; productName: string; price: { full: number }; textualAmount?: string; inStock?: boolean };
+    const data = (await res.json().catch(() => null)) as { data?: { productList?: SearchProduct[] } } | null;
     const list = data?.data?.productList ?? [];
     return list
-      .filter((p: { inStock?: boolean }) => p.inStock !== false)
-      .map((p: { productId: number; productName: string; price: { full: number }; textualAmount?: string }) => ({
+      .filter((p) => p.inStock !== false)
+      .map((p) => ({
         productId: p.productId,
         productName: p.productName,
         price: p.price?.full ?? 0,
@@ -67,7 +78,7 @@ export class RohlikClient {
 
   async getCart(): Promise<{ items: Record<string, unknown>; totalPrice: number }> {
     const res = await fetch(`${BASE}/v2/cart`, { headers: this.headers() });
-    const data = await res.json().catch(() => null);
+    const data = (await res.json().catch(() => null)) as { data?: { items?: Record<string, unknown>; totalPrice?: number } } | null;
     return { items: data?.data?.items ?? {}, totalPrice: data?.data?.totalPrice ?? 0 };
   }
 }

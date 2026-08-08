@@ -82,12 +82,15 @@ export async function fillRohlikCart(
     return { item, products };
   });
 
-  const prompt = itemsWithResults.map(({ item, products }) => {
-    if (products.length === 0) return `${item.name}: NENALEZENO`;
-    const opts = products.map((p, i) =>
-      `${i}:id=${p.productId},"${p.productName}",${p.price}Kč,${p.textualAmount ?? ""}`
+  // Položky číslujeme indexem — AI odpověď se pak páruje podle indexu, ne podle
+  // textu jména (to je nespolehlivé, model název občas přeformuluje nebo k němu
+  // připojí gramáž a přesná shoda stringů selže i u správně vybraného produktu).
+  const prompt = itemsWithResults.map(({ item, products }, i) => {
+    if (products.length === 0) return `${i}) ${item.name}: NENALEZENO`;
+    const opts = products.map((p, oi) =>
+      `${oi}:id=${p.productId},"${p.productName}",${p.price}Kč,${p.textualAmount ?? ""}`
     ).join("|");
-    return `${item.name}(${item.amount}${item.unit}):[${opts}]`;
+    return `${i}) ${item.name}(${item.amount}${item.unit}):[${opts}]`;
   }).join("\n");
 
   console.log("Prompt pro AI:\n" + prompt.slice(0, 800));
@@ -98,22 +101,23 @@ export async function fillRohlikCart(
     reasoning_effort: "low",
     messages: [{
       role: "user",
-      content: `Vyber nejlepší produkt pro každou položku (správná gramáž, nejnižší cena). Vrať POUZE JSON pole:\n[{"n":"název položky","id":123}]\nPro nenalezené použij id:null.\n\n${prompt}`,
+      content: `Vyber nejlepší produkt pro každou položku (správná gramáž, nejnižší cena). Vrať POUZE JSON pole se stejným počtem prvků, seřazené podle indexu položky:\n[{"i":0,"id":123}]\ni = index položky (číslo před závorkou), id = id vybraného produktu. Pro nenalezené použij id:null.\n\n${prompt}`,
     }],
   });
 
   const aiText = aiResp.choices[0]?.message?.content ?? "";
   console.log("AI výběr:", aiText.slice(0, 500));
   const match = aiText.match(/\[[\s\S]*\]/);
-  const selections: { n: string; id: number | null }[] = match ? JSON.parse(match[0]) : [];
+  const selections: { i: number; id: number | null }[] = match ? JSON.parse(match[0]) : [];
 
   // ── FÁZE 3: Přidání do košíku ──
   const toAdd: { productId: number; quantity: number }[] = [];
   const addedItems: RohlikCartResult["addedItems"] = [];
   const notFoundItems: string[] = [];
 
-  for (const { item, products } of itemsWithResults) {
-    const sel = selections.find((s) => s.n === item.name);
+  for (let i = 0; i < itemsWithResults.length; i++) {
+    const { item, products } = itemsWithResults[i];
+    const sel = selections.find((s) => s.i === i);
     if (!sel?.id) { notFoundItems.push(item.name); continue; }
     const product = products.find((p) => p.productId === sel.id);
     if (!product) { notFoundItems.push(item.name); continue; }
