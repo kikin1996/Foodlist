@@ -55,7 +55,10 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
     name: string; amount: string; unit: string; category: string;
   }[];
 
-  const days = Object.keys(meals);
+  const DAY_ORDER = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
+  const days = Object.keys(meals).sort(
+    (a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b)
+  );
 
   const categories = Array.from(new Set(shoppingList.map((i) => i.category)));
 
