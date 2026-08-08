@@ -21,6 +21,11 @@ export interface ShoppingItem {
   amount: string;
   unit: string;
   category: "zelenina" | "ovoce" | "maso" | "mlecne" | "pecivo" | "suche" | "ostatni";
+  // Rohlík ID vybrané už při generování jídelníčku (z předem staženého katalogu) —
+  // umožňuje přidat položku do košíku bez dalšího živého vyhledávání na Rohlíku.
+  rohlikId?: number | null;
+  rohlikName?: string;
+  rohlikPrice?: number;
 }
 
 export interface Recipe {
@@ -80,8 +85,9 @@ PRAVIDLA:
 - Jídla musí být MAXIMÁLNĚ ROZMANITÁ — každé jídlo musí být zcela jiné (jiný typ masa, jiná příloha, jiný způsob přípravy)
 - České názvy ingrediencí
 - Nákupní seznam musí být přesný s množstvím
-${catalog && catalog.length > 0 ? `- INSPIRUJ SE těmito dostupnými produkty na Rohlík.cz (nemusíš použít jen tyto — jde o inspiraci):
-${catalog.map((p) => `  ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}` : "- Ingredience musí být dostupné na Rohlík.cz"}
+${catalog && catalog.length > 0 ? `- PŘEDNOSTNĚ používej tyto reálně dostupné produkty z Rohlík.cz (u každého je #ID):
+${catalog.map((p) => `  #${p.id} ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}
+- U každé položky nákupního seznamu, která odpovídá produktu z tohoto seznamu, VYPLŇ jeho rohlikId, rohlikName a rohlikPrice přesně podle seznamu výše. Pouze pokud pro položku v seznamu opravdu není žádný vhodný produkt, nastav rohlikId na null.` : "- Ingredience musí být dostupné na Rohlík.cz"}
 
 ${previousMeals && previousMeals.length > 0 ? `
 ⛔ PŘÍSNÝ ZÁKAZ — TATO JÍDLA NESMÍŠ NIKDY POUŽÍT (jsou z předchozích jídelníčků):
@@ -133,11 +139,12 @@ ${days.map((d) => `    "${d}": { ${meals.map((m) => `"${m}": "název"`).join(", 
     }
   },
   "shoppingList": [
-    { "name": "název", "amount": "500", "unit": "g", "category": "zelenina" }
+    { "name": "název", "amount": "500", "unit": "g", "category": "zelenina", "rohlikId": 123456, "rohlikName": "přesný název z katalogu", "rohlikPrice": 45.9 }
   ]
 }
 
 Kategorie: zelenina, ovoce, maso, mlecne, pecivo, suche, ostatni
+rohlikId/rohlikName/rohlikPrice: podle katalogu výše (viz systémová instrukce), jinak rohlikId: null a rohlikName/rohlikPrice vynech.
 Recepty pouze pro unikátní jídla (nesnídaně jako ovesná kaše nemusí mít recept).`,
       },
     ],

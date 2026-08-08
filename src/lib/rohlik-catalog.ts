@@ -61,6 +61,19 @@ const CATEGORIES: { keyword: string; cat: string }[] = [
   { keyword: "quinoa", cat: "suche" },
   { keyword: "cizrna konzerva", cat: "suche" },
   { keyword: "fazole konzerva", cat: "suche" },
+  { keyword: "tuňák konzerva", cat: "suche" },
+  { keyword: "tagliatelle", cat: "suche" },
+  // Bylinky
+  { keyword: "petržel čerstvá", cat: "zelenina" },
+  { keyword: "bazalka čerstvá", cat: "zelenina" },
+  { keyword: "avokádo", cat: "ovoce" },
+  { keyword: "limetka", cat: "ovoce" },
+  // Ryby a mořské plody
+  { keyword: "krevety", cat: "maso" },
+  { keyword: "pstruh", cat: "maso" },
+  { keyword: "kachní prsa", cat: "maso" },
+  { keyword: "hovězí steak", cat: "maso" },
+  { keyword: "ricotta", cat: "mlecne" },
   // Ostatní (oleje, omáčky, konzervy)
   { keyword: "rajčata konzerva", cat: "ostatni" },
   { keyword: "kokosové mléko", cat: "ostatni" },

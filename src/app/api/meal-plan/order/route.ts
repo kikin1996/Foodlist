@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/encryption";
 import { fillRohlikCart } from "@/lib/rohlik";
+import type { CatalogProduct } from "@/lib/rohlik-catalog";
 import type { ShoppingItem } from "@/lib/meal-planner";
 
 export const maxDuration = 300; // Vercel Pro: 5 minut timeout
@@ -41,12 +42,14 @@ export async function POST(req: NextRequest) {
   try {
     const rohlikPassword = decrypt(user.rohlikPassEnc);
     const shoppingList = plan.shoppingList as unknown as ShoppingItem[];
+    const catalog = user.preferences?.rohlikCatalog as unknown as CatalogProduct[] | undefined;
 
     const result = await fillRohlikCart(
       shoppingList,
       user.rohlikEmail,
       rohlikPassword,
-      user.preferences?.householdSize ?? 2
+      user.preferences?.householdSize ?? 2,
+      catalog
     );
 
     const order = await prisma.order.create({
