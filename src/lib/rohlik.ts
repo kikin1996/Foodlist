@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { RohlikClient, type RohlikProduct } from "./rohlik-client";
+import { RohlikClient, RohlikRateLimitError, type RohlikProduct } from "./rohlik-client";
 import type { ShoppingItem } from "./meal-planner";
 
 export { verifyRohlikCredentials } from "./rohlik-client";
@@ -67,6 +67,7 @@ export async function fillRohlikCart(
         try {
           return { key, products: (await client.searchProducts(key)).slice(0, 3) };
         } catch (e) {
+          if (e instanceof RohlikRateLimitError) throw e;
           console.warn(`Vyhledání "${key}" selhalo:`, String(e).slice(0, 100));
           return { key, products: [] as RohlikProduct[] };
         }
