@@ -86,6 +86,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return chunks;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function fetchRohlikCatalog(
   email: string,
   password: string
@@ -95,14 +99,15 @@ export async function fetchRohlikCatalog(
 
   const products: CatalogProduct[] = [];
   const seen = new Set<number>();
-  const groups = chunk(CATEGORIES, 5);
+  const groups = chunk(CATEGORIES, 3);
 
-  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů (po 5 souběžně)`);
+  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů (po 3 souběžně)`);
 
-  for (const group of groups) {
+  for (let gi = 0; gi < groups.length; gi++) {
     const results = await Promise.allSettled(
-      group.map(async (q) => ({ q, items: await client.searchProducts(q.keyword) }))
+      groups[gi].map(async (q) => ({ q, items: await client.searchProducts(q.keyword) }))
     );
+    if (gi < groups.length - 1) await sleep(300);
     for (const res of results) {
       if (res.status === "rejected") {
         console.warn("Dotaz selhal:", String(res.reason).slice(0, 60));

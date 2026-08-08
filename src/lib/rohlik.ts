@@ -46,7 +46,10 @@ export async function fillRohlikCart(
   await client.clearCart();
   console.log("Košík vyčištěn");
 
-  // ── FÁZE 1: Vyhledávání (max 5 souběžně, přímé Rohlík API nemá agresivní rate limit) ──
+  // ── FÁZE 1: Vyhledávání ──
+  // Menší souběžnost + krátká pauza mezi dávkami — velký nárazový počet dotazů
+  // (60+ položek) spouští Rohlíkův rate limit, který pak i pár desítek sekund
+  // vrací 429 na zápisové požadavky (přidání do košíku).
   const searchKeyMap: Record<string, string> = {};
   for (const item of shoppingList) {
     searchKeyMap[item.name] = simplifyName(item.name);
@@ -56,10 +59,10 @@ export async function fillRohlikCart(
   console.log("Klíče:", Object.values(searchKeyMap).join(", "));
 
   const allResults: Record<string, RohlikProduct[]> = {};
-  const searchGroups = chunk(shoppingList, 5);
-  for (const group of searchGroups) {
+  const searchGroups = chunk(shoppingList, 3);
+  for (let gi = 0; gi < searchGroups.length; gi++) {
     const results = await Promise.all(
-      group.map(async (item) => {
+      searchGroups[gi].map(async (item) => {
         const key = searchKeyMap[item.name];
         try {
           return { key, products: (await client.searchProducts(key)).slice(0, 3) };
@@ -70,6 +73,7 @@ export async function fillRohlikCart(
       })
     );
     for (const r of results) allResults[r.key] = r.products;
+    if (gi < searchGroups.length - 1) await sleep(300);
   }
 
   // ── FÁZE 2: Výběr nejlepšího produktu přes AI ──
@@ -135,12 +139,18 @@ export async function fillRohlikCart(
     });
   }
 
+  // Krátká pauza po náporu vyhledávání, ať se Rohlíkův rate limit stihne uvolnit
+  // před zápisovými požadavky (retry s backoffem je navíc v RohlikClient).
+  await sleep(2000);
+
   const failedToAdd = new Set<number>();
-  for (const group of chunk(toAdd, 5)) {
+  const addGroups = chunk(toAdd, 3);
+  for (let gi = 0; gi < addGroups.length; gi++) {
     const results = await Promise.all(
-      group.map((t) => client.addToCart(t.productId, t.quantity).then((ok) => ({ ...t, ok })))
+      addGroups[gi].map((t) => client.addToCart(t.productId, t.quantity).then((ok) => ({ ...t, ok })))
     );
     for (const r of results) if (!r.ok) failedToAdd.add(r.productId);
+    if (gi < addGroups.length - 1) await sleep(300);
   }
 
   const finalAdded = addedItems.filter((_, i) => !failedToAdd.has(toAdd[i].productId));

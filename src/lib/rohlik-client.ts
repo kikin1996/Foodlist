@@ -5,7 +5,7 @@
 // Set-Cookie hlavičky (getSetCookie() vracelo prázdno), takže se session cookie
 // nikdy neuložila a každý další request (add/get cart) běžel jako anonymní
 // bez přihlášení — proto košík po objednávce vypadal prázdný i po úspěšném loginu.
-import { fetch } from "undici";
+import { fetch, type Response } from "undici";
 
 const BASE = "https://www.rohlik.cz/services/frontend-service";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
@@ -20,11 +20,28 @@ export interface RohlikProduct {
 
 export class RohlikAuthError extends Error {}
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// Po sérii rychlých dotazů (vyhledávání) Rohlík na pár desítek sekund rate-limituje
+// zápisové (a někdy i čtecí) požadavky s HTTP 429. Zkusíme to znovu s odstupem.
+async function fetchWithRetry(url: string, init: Parameters<typeof fetch>[1], retries = 3): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url, init);
+    if (res.status !== 429 || attempt === retries) return res;
+    const wait = (attempt + 1) * 4000;
+    console.warn(`Rohlík 429 na ${url.split("?")[0]}, čekám ${wait}ms (pokus ${attempt + 1}/${retries})`);
+    await sleep(wait);
+  }
+  throw new Error("unreachable");
+}
+
 export class RohlikClient {
   private cookie = "";
 
   async login(email: string, password: string): Promise<void> {
-    const res = await fetch(`${BASE}/login`, {
+    const res = await fetchWithRetry(`${BASE}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": UA },
       body: JSON.stringify({ email, password }),
@@ -35,7 +52,6 @@ export class RohlikClient {
     }
     const setCookies = res.headers.getSetCookie();
     this.cookie = setCookies.map((c) => c.split(";")[0]).join("; ");
-    console.log(`Rohlík login OK, Set-Cookie count=${setCookies.length}, cookie length=${this.cookie.length}`);
     if (!this.cookie) {
       throw new Error("Rohlík login OK, ale nepřišla session cookie — zkuste to znovu.");
     }
@@ -46,7 +62,7 @@ export class RohlikClient {
   }
 
   async searchProducts(keyword: string): Promise<RohlikProduct[]> {
-    const res = await fetch(
+    const res = await fetchWithRetry(
       `${BASE}/search-metadata?search=${encodeURIComponent(keyword)}&companyId=1`,
       { headers: this.headers() }
     );
@@ -66,11 +82,11 @@ export class RohlikClient {
   }
 
   async clearCart(): Promise<void> {
-    await fetch(`${BASE}/v2/cart?clear=true`, { method: "DELETE", headers: this.headers() });
+    await fetchWithRetry(`${BASE}/v2/cart?clear=true`, { method: "DELETE", headers: this.headers() });
   }
 
   async addToCart(productId: number, quantity: number): Promise<boolean> {
-    const res = await fetch(`${BASE}/v2/cart`, {
+    const res = await fetchWithRetry(`${BASE}/v2/cart`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ productId, quantity }),
@@ -88,7 +104,7 @@ export class RohlikClient {
   }
 
   async getCart(): Promise<{ items: Record<string, unknown>; totalPrice: number }> {
-    const res = await fetch(`${BASE}/v2/cart`, { headers: this.headers() });
+    const res = await fetchWithRetry(`${BASE}/v2/cart`, { headers: this.headers() });
     const text = await res.text();
     let data: { data?: { items?: Record<string, unknown>; totalPrice?: number } } | null = null;
     try { data = JSON.parse(text); } catch { /* not JSON */ }
