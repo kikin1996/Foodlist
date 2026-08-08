@@ -1,8 +1,20 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import type { UserPreferences } from "@prisma/client";
 import type { CatalogProduct } from "./rohlik-catalog";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Mapování starých Claude modelů na OpenAI ekvivalenty (pro existující uživatele)
+const MODEL_MAP: Record<string, string> = {
+  "claude-haiku-4-5-20251001": "gpt-5-mini",
+  "claude-sonnet-4-6": "gpt-5.1",
+  "claude-opus-4-8": "gpt-5.1",
+};
+
+export function resolveModel(aiModel?: string | null): string {
+  if (!aiModel) return "gpt-5-mini";
+  return MODEL_MAP[aiModel] ?? aiModel;
+}
 
 export interface ShoppingItem {
   name: string;
@@ -88,11 +100,13 @@ export async function generateMealPlan(prefs: UserPreferences, catalog?: Catalog
     ? prefs.includedMeals.split(",").filter(Boolean)
     : ["breakfast", "lunch", "dinner"];
 
-  const response = await client.messages.create({
-    model: (prefs.aiModel ?? "claude-haiku-4-5-20251001") as string,
-    max_tokens: 8000,
-    system: buildSystemPrompt(prefs, catalog, previousMeals),
+  const response = await client.chat.completions.create({
+    model: resolveModel(prefs.aiModel),
+    max_completion_tokens: 12000,
+    reasoning_effort: "low",
+    response_format: { type: "json_object" },
     messages: [
+      { role: "system", content: buildSystemPrompt(prefs, catalog, previousMeals) },
       {
         role: "user",
         content: `Vytvoř ZCELA NOVÝ a ORIGINÁLNÍ jídelníček pro dny: ${days.join(", ")}.
@@ -129,10 +143,10 @@ Recepty pouze pro unikátní jídla (nesnídaně jako ovesná kaše nemusí mít
     ],
   });
 
-  const content = response.content[0];
-  if (content.type !== "text") throw new Error("Unexpected response type");
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Empty response from OpenAI");
 
-  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON in response");
 
   return JSON.parse(jsonMatch[0]) as WeeklyMealPlan;

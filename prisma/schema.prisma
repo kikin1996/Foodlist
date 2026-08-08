@@ -46,7 +46,7 @@ model UserPreferences {
 
   includedMeals        String   @default("breakfast,lunch,dinner")
   includedDays         String   @default("pondeli,utery,streda,ctvrtek,patek,sobota,nedele")
-  aiModel              String   @default("claude-haiku-4-5-20251001")
+  aiModel              String   @default("gpt-5-mini")
 
   rohlikCatalog        Json?    // cached product catalog from Rohlik
   catalogUpdatedAt     DateTime?

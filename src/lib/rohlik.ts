@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ShoppingItem } from "./meal-planner";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const ROHLIK_MCP_URL = "https://mcp.rohlik.cz/mcp";
 
 export interface RohlikCartResult {
@@ -144,18 +144,19 @@ export async function fillRohlikCart(
 
     console.log("Prompt pro Claude:\n" + prompt.slice(0, 800));
 
-    const claudeResp = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+    const aiResp = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 4096,
+      reasoning_effort: "low",
       messages: [{
         role: "user",
-        content: `Vyber nejlepší produkt pro každou položku (správná gramáž, nejnižší cena). Vrať POUZE JSON:\n[{"n":"název položky","id":123}]\nPro nenalezené použij id:null.\n\n${prompt}`,
+        content: `Vyber nejlepší produkt pro každou položku (správná gramáž, nejnižší cena). Vrať POUZE JSON pole:\n[{"n":"název položky","id":123}]\nPro nenalezené použij id:null.\n\n${prompt}`,
       }],
     });
 
-    const claudeText = (claudeResp.content[0] as Anthropic.TextBlock).text;
-    console.log("Claude výběr:", claudeText.slice(0, 500));
-    const match = claudeText.match(/\[[\s\S]*\]/);
+    const aiText = aiResp.choices[0]?.message?.content ?? "";
+    console.log("AI výběr:", aiText.slice(0, 500));
+    const match = aiText.match(/\[[\s\S]*\]/);
     const selections: { n: string; id: number | null }[] = match ? JSON.parse(match[0]) : [];
 
     // ── FÁZE 3: Jedno hromadné přidání do košíku ──

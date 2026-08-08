@@ -272,9 +272,9 @@ export default function PreferencesForm({ initialData }: Props) {
           <label className="block text-sm font-medium text-gray-700 mb-2">AI model pro generování jídelníčku</label>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", desc: "Rychlý, levný", badge: "⚡" },
-              { value: "claude-sonnet-4-6", label: "Sonnet 4.6", desc: "Vyvážený", badge: "⚖️" },
-              { value: "claude-opus-4-8", label: "Opus 4.8", desc: "Nejlepší kvalita", badge: "🏆" },
+              { value: "gpt-5-nano", label: "GPT-5 Nano", desc: "Rychlý, levný", badge: "⚡" },
+              { value: "gpt-5-mini", label: "GPT-5 Mini", desc: "Vyvážený", badge: "⚖️" },
+              { value: "gpt-5.1", label: "GPT-5.1", desc: "Nejlepší kvalita", badge: "🏆" },
             ].map((m) => (
               <button
                 key={m.value}
