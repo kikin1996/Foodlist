@@ -29,25 +29,31 @@ export async function POST() {
     if (user.rohlikEmail && user.rohlikPassEnc) {
       const prefs = user.preferences;
 
-      if (isCatalogFresh(prefs.catalogUpdatedAt ?? null)) {
+      const cached = (prefs.rohlikCatalog as unknown as CatalogProduct[]) ?? [];
+
+      if (isCatalogFresh(prefs.catalogUpdatedAt ?? null) && cached.length > 0) {
         // Použij cached katalog z DB
-        catalog = (prefs.rohlikCatalog as unknown as CatalogProduct[]) ?? undefined;
-        console.log(`Používám cached katalog: ${catalog?.length ?? 0} produktů`);
+        catalog = cached;
+        console.log(`Používám cached katalog: ${catalog.length} produktů`);
       } else {
-        // Stáhni nový katalog a ulož do DB
+        // Stáhni nový katalog a ulož do DB (prázdný výsledek necachujeme)
         try {
           console.log("Stahuji čerstvý katalog z Rohlíku...");
           const rohlikPassword = decrypt(user.rohlikPassEnc);
           catalog = await fetchRohlikCatalog(user.rohlikEmail, rohlikPassword);
           console.log(`Katalog stažen: ${catalog.length} produktů`);
 
-          await prisma.userPreferences.update({
-            where: { userId: session.user.id },
-            data: {
-              rohlikCatalog: catalog as unknown as object[],
-              catalogUpdatedAt: new Date(),
-            },
-          });
+          if (catalog.length > 0) {
+            await prisma.userPreferences.update({
+              where: { userId: session.user.id },
+              data: {
+                rohlikCatalog: catalog as unknown as object[],
+                catalogUpdatedAt: new Date(),
+              },
+            });
+          } else {
+            catalog = cached.length > 0 ? cached : undefined;
+          }
         } catch (e) {
           console.warn("Katalog se nepodařilo stáhnout:", e);
         }

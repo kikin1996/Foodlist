@@ -45,7 +45,7 @@ async function searchBatch(
   client: Client,
   keywords: string[]
 ): Promise<Record<string, RohlikProduct[]>> {
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const queries = keywords.map((k) => ({ keyword: k }));
       const result = await client.callTool({ name: "batch_search_products", arguments: { queries } });
@@ -59,9 +59,9 @@ async function searchBatch(
       return map;
     } catch (err) {
       const msg = String(err);
-      if ((msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429")) && attempt < 3) {
-        console.log(`Rate limit, čekám ${(attempt + 1) * 35}s...`);
-        await sleep((attempt + 1) * 35000);
+      if ((msg.includes("1015") || msg.includes("rate_limit") || msg.includes("429")) && attempt < 2) {
+        console.log(`Rate limit, čekám ${(attempt + 1) * 15}s...`);
+        await sleep((attempt + 1) * 15000);
         continue;
       }
       console.error("Search batch error:", msg.slice(0, 100));
@@ -108,12 +108,18 @@ export async function fillRohlikCart(
     }
 
     const allResults: Record<string, RohlikProduct[]> = {};
-    const batches = chunk(shoppingList, 4);
+    const batches = chunk(shoppingList, 6);
     console.log(`Vyhledávám ${shoppingList.length} položek (${batches.length} dávek)`);
     console.log("Klíče:", Object.values(searchKeyMap).join(", "));
 
-    const batchGroups = chunk(batches, 3);
+    // Časový rozpočet: po 180s přestaň hledat, ať funkce stihne odpovědět
+    const searchDeadline = Date.now() + 180_000;
+    const batchGroups = chunk(batches, 2);
     for (let gi = 0; gi < batchGroups.length; gi++) {
+      if (Date.now() > searchDeadline) {
+        console.warn(`Časový limit vyhledávání — přeskakuji zbylých ${batchGroups.length - gi} skupin`);
+        break;
+      }
       const group = batchGroups[gi];
       const results = await Promise.all(
         group.map((batch) =>
@@ -121,7 +127,7 @@ export async function fillRohlikCart(
         )
       );
       results.forEach((r) => Object.assign(allResults, r));
-      if (gi < batchGroups.length - 1) await sleep(4000);
+      if (gi < batchGroups.length - 1) await sleep(2000);
     }
 
     // ── FÁZE 2: Výběr nejlepšího produktu ──
@@ -188,7 +194,7 @@ export async function fillRohlikCart(
       const addChunks = chunk(toAdd, 20);
       for (let i = 0; i < addChunks.length; i++) {
         let added = false;
-        for (let attempt = 0; attempt < 4; attempt++) {
+        for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await mcpClient.callTool({ name: "add_items_to_cart", arguments: { items: addChunks[i] } });
             const resData = JSON.parse((res.content as { type: string; text: string }[])[0].text);
@@ -198,14 +204,14 @@ export async function fillRohlikCart(
           } catch (err) {
             const msg = String(err);
             console.error(`add_to_cart chunk ${i + 1} attempt ${attempt + 1} failed:`, msg.slice(0, 150));
-            if ((msg.includes("1015") || msg.includes("rate_limit")) && attempt < 3) {
-              await sleep((attempt + 1) * 35000);
+            if ((msg.includes("1015") || msg.includes("rate_limit")) && attempt < 2) {
+              await sleep((attempt + 1) * 15000);
               continue;
             }
             break;
           }
         }
-        if (!added) console.error(`Chunk ${i + 1} se nepodařilo přidat ani po 4 pokusech`);
+        if (!added) console.error(`Chunk ${i + 1} se nepodařilo přidat ani po 3 pokusech`);
         if (i < addChunks.length - 1) await sleep(3000);
       }
     }

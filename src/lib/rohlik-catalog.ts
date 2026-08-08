@@ -105,22 +105,28 @@ export async function fetchRohlikCatalog(
   await client.connect(transport);
 
   const products: CatalogProduct[] = [];
-  const batches = chunk(CATEGORIES, 4);
+  const batches = chunk(CATEGORIES, 6);
 
-  console.log(`Stahuji katalog paralelně: ${CATEGORIES.length} dotazů v ${batches.length} dávkách`);
+  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů v ${batches.length} dávkách (po 2 souběžně)`);
 
-  // Spusť všechny dávky paralelně — žádné čekání mezi nimi
+  // Max 2 dávky souběžně s krátkou pauzou — plný paralelismus spouští Cloudflare rate limit
   try {
-    const batchResults = await Promise.allSettled(
-      batches.map(async (batch) => {
-        const result = await client.callTool({
-          name: "batch_search_products",
-          arguments: { queries: batch.map((q) => ({ keyword: q.keyword })) },
-        });
-        const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
-        return { batch, data };
-      })
-    );
+    async function runBatch(batch: { keyword: string; cat: string }[]) {
+      const result = await client.callTool({
+        name: "batch_search_products",
+        arguments: { queries: batch.map((q) => ({ keyword: q.keyword })) },
+      });
+      const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
+      return { batch, data };
+    }
+
+    const batchResults: PromiseSettledResult<Awaited<ReturnType<typeof runBatch>>>[] = [];
+    const groups = chunk(batches, 2);
+    for (let gi = 0; gi < groups.length; gi++) {
+      const results = await Promise.allSettled(groups[gi].map(runBatch));
+      batchResults.push(...results);
+      if (gi < groups.length - 1) await sleep(1500);
+    }
 
     const seen = new Set<number>();
     for (const res of batchResults) {
