@@ -1,7 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-
-const ROHLIK_MCP_URL = "https://mcp.rohlik.cz/mcp";
+import { RohlikClient } from "./rohlik-client";
 
 export interface CatalogProduct {
   id: number;
@@ -11,7 +8,6 @@ export interface CatalogProduct {
   category: string;
 }
 
-// Kategorie — optimalizováno pro Vercel 60s timeout (16 batches × 4 = 64 dotazů)
 const CATEGORIES: { keyword: string; cat: string }[] = [
   // Maso & ryby
   { keyword: "kuřecí prsa", cat: "maso" },
@@ -84,10 +80,6 @@ const CATEGORIES: { keyword: string; cat: string }[] = [
 
 const CATALOG_MAX_AGE_HOURS = 24;
 
-async function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 function chunk<T>(arr: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
@@ -98,61 +90,38 @@ export async function fetchRohlikCatalog(
   email: string,
   password: string
 ): Promise<CatalogProduct[]> {
-  const transport = new StreamableHTTPClientTransport(new URL(ROHLIK_MCP_URL), {
-    requestInit: { headers: { "rhl-email": email, "rhl-pass": password } },
-  });
-  const client = new Client({ name: "kostki-catalog", version: "1.0.0" });
-  await client.connect(transport);
+  const client = new RohlikClient();
+  await client.login(email, password);
 
   const products: CatalogProduct[] = [];
-  const batches = chunk(CATEGORIES, 6);
+  const seen = new Set<number>();
+  const groups = chunk(CATEGORIES, 5);
 
-  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů v ${batches.length} dávkách (po 2 souběžně)`);
+  console.log(`Stahuji katalog: ${CATEGORIES.length} dotazů (po 5 souběžně)`);
 
-  // Max 2 dávky souběžně s krátkou pauzou — plný paralelismus spouští Cloudflare rate limit
-  try {
-    async function runBatch(batch: { keyword: string; cat: string }[]) {
-      const result = await client.callTool({
-        name: "batch_search_products",
-        arguments: { queries: batch.map((q) => ({ keyword: q.keyword })) },
-      });
-      const data = JSON.parse((result.content as { type: string; text: string }[])[0].text);
-      return { batch, data };
-    }
-
-    const batchResults: PromiseSettledResult<Awaited<ReturnType<typeof runBatch>>>[] = [];
-    const groups = chunk(batches, 2);
-    for (let gi = 0; gi < groups.length; gi++) {
-      const results = await Promise.allSettled(groups[gi].map(runBatch));
-      batchResults.push(...results);
-      if (gi < groups.length - 1) await sleep(1500);
-    }
-
-    const seen = new Set<number>();
-    for (const res of batchResults) {
+  for (const group of groups) {
+    const results = await Promise.allSettled(
+      group.map(async (q) => ({ q, items: await client.searchProducts(q.keyword) }))
+    );
+    for (const res of results) {
       if (res.status === "rejected") {
-        console.warn("Dávka selhala:", String(res.reason).slice(0, 60));
+        console.warn("Dotaz selhal:", String(res.reason).slice(0, 60));
         continue;
       }
-      const { batch, data } = res.value;
-      for (let i = 0; i < batch.length; i++) {
-        const prods = data.results?.[i]?.products ?? [];
-        for (const p of prods.filter((p: { inStock: boolean }) => p.inStock).slice(0, 6)) {
-          if (!seen.has(p.productId)) {
-            seen.add(p.productId);
-            products.push({
-              id: p.productId,
-              name: p.productName,
-              price: p.price,
-              amount: p.textualAmount ?? "",
-              category: batch[i].cat,
-            });
-          }
+      const { q, items } = res.value;
+      for (const p of items.slice(0, 6)) {
+        if (!seen.has(p.productId)) {
+          seen.add(p.productId);
+          products.push({
+            id: p.productId,
+            name: p.productName,
+            price: p.price,
+            amount: p.textualAmount ?? "",
+            category: q.cat,
+          });
         }
       }
     }
-  } finally {
-    await client.close();
   }
 
   console.log(`Katalog dokončen: ${products.length} unikátních produktů`);
