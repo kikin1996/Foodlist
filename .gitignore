@@ -27,3 +27,5 @@ prisma/migrations/
 .DS_Store
 *.pem
 Thumbs.db
+
+.vercel
