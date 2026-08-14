@@ -34,10 +34,10 @@ export class RohlikClient {
   private consecutive429 = 0;
   private readonly rateLimitThreshold = 4;
 
-  private async fetchWithRetry(url: string, init: Parameters<typeof fetch>[1], retries = 1): Promise<Response> {
+  private async fetchWithRetry(stage: string, url: string, init: Parameters<typeof fetch>[1], retries = 1): Promise<Response> {
     if (this.consecutive429 >= this.rateLimitThreshold) {
       throw new RohlikRateLimitError(
-        "Rohlík momentálně omezuje počet požadavků — zkuste to znovu za pár minut."
+        `Rohlík momentálně omezuje počet požadavků (fáze: ${stage}) — zkuste to znovu za pár minut.`
       );
     }
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -48,26 +48,26 @@ export class RohlikClient {
       }
       this.consecutive429++;
       if (this.consecutive429 >= this.rateLimitThreshold) {
-        console.warn(`Rohlík rate limit trvalý (${this.consecutive429}x za sebou) — vzdávám se dalších pokusů.`);
+        console.warn(`Rohlík rate limit trvalý (${this.consecutive429}x za sebou, fáze: ${stage}) — vzdávám se dalších pokusů.`);
         throw new RohlikRateLimitError(
-          "Rohlík momentálně omezuje počet požadavků — zkuste to znovu za pár minut."
+          `Rohlík momentálně omezuje počet požadavků (fáze: ${stage}, ${this.consecutive429}x 429 za sebou) — zkuste to znovu za pár minut.`
         );
       }
       if (attempt === retries) return res;
-      console.warn(`Rohlík 429 na ${url.split("?")[0]}, čekám 3000ms (pokus ${attempt + 1}/${retries})`);
+      console.warn(`Rohlík 429 na ${url.split("?")[0]} (fáze: ${stage}), čekám 3000ms (pokus ${attempt + 1}/${retries})`);
       await sleep(3000);
     }
     throw new Error("unreachable");
   }
 
   async login(email: string, password: string): Promise<void> {
-    const res = await this.fetchWithRetry(`${BASE}/login`, {
+    const res = await this.fetchWithRetry("login", `${BASE}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "User-Agent": UA },
       body: JSON.stringify({ email, password }),
     });
     if (res.status === 429) {
-      throw new RohlikRateLimitError("Rohlík momentálně omezuje počet požadavků — zkuste to znovu za pár minut.");
+      throw new RohlikRateLimitError("Rohlík momentálně omezuje počet požadavků (fáze: login) — zkuste to znovu za pár minut.");
     }
     const data = (await res.json().catch(() => null)) as { status?: number; data?: { user?: unknown } } | null;
     if (!res.ok || data?.status !== 200 || !data?.data?.user) {
@@ -86,6 +86,7 @@ export class RohlikClient {
 
   async searchProducts(keyword: string): Promise<RohlikProduct[]> {
     const res = await this.fetchWithRetry(
+      "search",
       `${BASE}/search-metadata?search=${encodeURIComponent(keyword)}&companyId=1`,
       { headers: this.headers() }
     );
@@ -105,11 +106,11 @@ export class RohlikClient {
   }
 
   async clearCart(): Promise<void> {
-    await this.fetchWithRetry(`${BASE}/v2/cart?clear=true`, { method: "DELETE", headers: this.headers() });
+    await this.fetchWithRetry("clearCart", `${BASE}/v2/cart?clear=true`, { method: "DELETE", headers: this.headers() });
   }
 
   async addToCart(productId: number, quantity: number): Promise<boolean> {
-    const res = await this.fetchWithRetry(`${BASE}/v2/cart`, {
+    const res = await this.fetchWithRetry("addToCart", `${BASE}/v2/cart`, {
       method: "POST",
       headers: this.headers(),
       body: JSON.stringify({ productId, quantity }),
@@ -127,7 +128,7 @@ export class RohlikClient {
   }
 
   async getCart(): Promise<{ items: Record<string, unknown>; totalPrice: number }> {
-    const res = await this.fetchWithRetry(`${BASE}/v2/cart`, { headers: this.headers() });
+    const res = await this.fetchWithRetry("getCart", `${BASE}/v2/cart`, { headers: this.headers() });
     const text = await res.text();
     let data: { data?: { items?: Record<string, unknown>; totalPrice?: number } } | null = null;
     try { data = JSON.parse(text); } catch { /* not JSON */ }
