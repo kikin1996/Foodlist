@@ -221,14 +221,15 @@ export async function fillRohlikCart(
   // před zápisovými požadavky (retry s backoffem je navíc v RohlikClient).
   if (needsLiveSearch.length > 0) await sleep(2000);
 
+  // Zápis do košíku posíláme jednu položku po druhé (ne souběžně jako hledání) —
+  // Rohlíkův /v2/cart endpoint na pár souběžných POSTů reaguje 429 mnohem
+  // ochotněji než čtecí endpointy (login/search), viz diagnostika s fáze:addToCart.
   const failedToAdd = new Set<number>();
-  const addGroups = chunk(toAdd, 3);
-  for (let gi = 0; gi < addGroups.length; gi++) {
-    const results = await Promise.all(
-      addGroups[gi].map((t) => client.addToCart(t.productId, t.quantity).then((ok) => ({ ...t, ok })))
-    );
-    for (const r of results) if (!r.ok) failedToAdd.add(r.productId);
-    if (gi < addGroups.length - 1) await sleep(300);
+  for (let i = 0; i < toAdd.length; i++) {
+    const t = toAdd[i];
+    const ok = await client.addToCart(t.productId, t.quantity);
+    if (!ok) failedToAdd.add(t.productId);
+    if (i < toAdd.length - 1) await sleep(400);
   }
 
   const finalAdded = addedItems.filter((_, i) => !failedToAdd.has(toAdd[i].productId));
