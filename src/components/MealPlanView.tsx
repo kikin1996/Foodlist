@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import OrderButton from "./OrderButton";
 import ShoppingListQR from "./ShoppingListQR";
 
 const DAY_LABELS: Record<string, string> = {
@@ -142,9 +141,6 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
             </div>
             <div className="flex items-start gap-2">
               <ShoppingListQR mealPlanId={plan.id} />
-              {plan.status !== "ORDERED" && (
-                <OrderButton mealPlanId={plan.id} />
-              )}
             </div>
             {order?.status === "CART_FILLED" && order.estimatedTotal && (
               <div className="text-sm text-gray-500">
