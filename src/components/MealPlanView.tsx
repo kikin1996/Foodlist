@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import OrderButton from "./OrderButton";
+import ShoppingListQR from "./ShoppingListQR";
 
 const DAY_LABELS: Record<string, string> = {
   pondeli: "Pondělí",
@@ -139,9 +140,12 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
               <h3 className="font-semibold text-gray-900">Nákupní seznam</h3>
               <p className="text-sm text-gray-500">{shoppingList.length} položek</p>
             </div>
-            {plan.status !== "ORDERED" && (
-              <OrderButton mealPlanId={plan.id} />
-            )}
+            <div className="flex items-start gap-2">
+              <ShoppingListQR mealPlanId={plan.id} />
+              {plan.status !== "ORDERED" && (
+                <OrderButton mealPlanId={plan.id} />
+              )}
+            </div>
             {order?.status === "CART_FILLED" && order.estimatedTotal && (
               <div className="text-sm text-gray-500">
                 Odhadovaná cena: <strong>{order.estimatedTotal.toLocaleString("cs")} Kč</strong>
