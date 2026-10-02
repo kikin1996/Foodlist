@@ -62,7 +62,10 @@ export default function OnboardingPage() {
           cuisinePreferences: prefs.cuisinePreferences.join(","),
         }),
       });
-      if (!res.ok) throw new Error("Nepodařilo se uložit nastavení");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Nepodařilo se uložit nastavení");
+      }
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba");
