@@ -6,6 +6,7 @@ export interface CatalogProduct {
   price: number;
   amount: string;
   category: string;
+  baseLink?: string;
 }
 
 const CATEGORIES: { keyword: string; cat: string }[] = [
@@ -136,6 +137,7 @@ export async function fetchRohlikCatalog(
             price: p.price,
             amount: p.textualAmount ?? "",
             category: q.cat,
+            baseLink: p.baseLink,
           });
         }
       }
@@ -144,6 +146,10 @@ export async function fetchRohlikCatalog(
 
   console.log(`Katalog dokončen: ${products.length} unikátních produktů`);
   return products;
+}
+
+export function rohlikProductUrl(baseLink?: string): string | undefined {
+  return baseLink ? `https://www.rohlik.cz/?productPopup=${baseLink}` : undefined;
 }
 
 export function isCatalogFresh(updatedAt: Date | null): boolean {

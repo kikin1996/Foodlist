@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateMealPlan } from "@/lib/meal-planner";
-import { fetchRohlikCatalog, isCatalogFresh, type CatalogProduct } from "@/lib/rohlik-catalog";
+import { fetchRohlikCatalog, isCatalogFresh, rohlikProductUrl, type CatalogProduct } from "@/lib/rohlik-catalog";
 import { decrypt } from "@/lib/encryption";
 
 export const maxDuration = 120;
@@ -80,6 +80,16 @@ export async function POST() {
 
     // ── Generuj jídelníček ──
     const weekPlan = await generateMealPlan(user.preferences, catalog, previousMeals);
+
+    // Dohledej odkaz na produkt (z katalogu) pro položky, které AI namatchovalo na rohlikId
+    if (catalog && catalog.length > 0) {
+      const byId = new Map(catalog.map((p) => [p.id, p]));
+      for (const item of weekPlan.shoppingList) {
+        if (item.rohlikId != null) {
+          item.rohlikUrl = rohlikProductUrl(byId.get(item.rohlikId)?.baseLink);
+        }
+      }
+    }
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);

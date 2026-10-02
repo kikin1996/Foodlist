@@ -26,6 +26,7 @@ export interface ShoppingItem {
   rohlikId?: number | null;
   rohlikName?: string;
   rohlikPrice?: number;
+  rohlikUrl?: string;
 }
 
 export interface Recipe {

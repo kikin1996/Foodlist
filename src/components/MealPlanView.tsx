@@ -52,7 +52,7 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
     steps: string[]; calories: number;
   }>;
   const shoppingList = plan.shoppingList as {
-    name: string; amount: string; unit: string; category: string;
+    name: string; amount: string; unit: string; category: string; rohlikUrl?: string;
   }[];
 
   const DAY_ORDER = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
@@ -179,7 +179,20 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
                           key={idx}
                           className="flex items-center justify-between px-4 py-2.5"
                         >
-                          <span className="text-sm text-gray-700">{item.name}</span>
+                          <span className="text-sm text-gray-700 flex items-center gap-1.5">
+                            {item.name}
+                            {item.rohlikUrl && (
+                              <a
+                                href={item.rohlikUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Zobrazit na Rohlík.cz"
+                                className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 hover:text-brand-600 hover:border-brand-400 text-[10px] font-semibold"
+                              >
+                                i
+                              </a>
+                            )}
+                          </span>
                           <span className="text-sm text-gray-500 font-medium">
                             {item.amount} {item.unit}
                           </span>

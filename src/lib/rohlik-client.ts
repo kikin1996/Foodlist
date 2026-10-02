@@ -16,6 +16,7 @@ export interface RohlikProduct {
   price: number;
   textualAmount?: string;
   inStock: boolean;
+  baseLink?: string;
 }
 
 export class RohlikAuthError extends Error {}
@@ -91,7 +92,7 @@ export class RohlikClient {
       { headers: this.headers() }
     );
     if (!res.ok) return [];
-    type SearchProduct = { productId: number; productName: string; price: { full: number }; textualAmount?: string; inStock?: boolean };
+    type SearchProduct = { productId: number; productName: string; price: { full: number }; textualAmount?: string; inStock?: boolean; baseLink?: string };
     const data = (await res.json().catch(() => null)) as { data?: { productList?: SearchProduct[] } } | null;
     const list = data?.data?.productList ?? [];
     return list
@@ -102,6 +103,7 @@ export class RohlikClient {
         price: p.price?.full ?? 0,
         textualAmount: p.textualAmount,
         inStock: true,
+        baseLink: p.baseLink,
       }));
   }
 

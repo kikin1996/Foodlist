@@ -8,6 +8,7 @@ interface ShoppingItem {
   category: string;
   rohlikName?: string;
   rohlikPrice?: number;
+  rohlikUrl?: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -64,9 +65,20 @@ export default async function ShoppingListPage({ params }: { params: Promise<{ i
                 <ul className="space-y-2">
                   {catItems.map((item, idx) => (
                     <li key={idx} className="flex items-start justify-between gap-3 text-sm">
-                      <span className="text-gray-800">
+                      <span className="text-gray-800 inline-flex items-center gap-1.5 flex-wrap">
                         {item.rohlikName ?? item.name}
                         <span className="text-gray-400"> — {item.amount}{item.unit}</span>
+                        {item.rohlikUrl && (
+                          <a
+                            href={item.rohlikUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Zobrazit na Rohlík.cz"
+                            className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 text-[10px] font-semibold"
+                          >
+                            i
+                          </a>
+                        )}
                       </span>
                       {item.rohlikPrice != null && (
                         <span className="text-gray-500 font-medium whitespace-nowrap">
