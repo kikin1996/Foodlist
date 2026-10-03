@@ -47,6 +47,7 @@ model UserPreferences {
   includedMeals        String   @default("breakfast,lunch,dinner")
   includedDays         String   @default("pondeli,utery,streda,ctvrtek,patek,sobota,nedele")
   aiModel              String   @default("gpt-5-mini")
+  kitchenAppliance     String   @default("none") // none | thermomix | monsieur_cuisine
 
   rohlikCatalog        Json?    // cached product catalog from Rohlik
   catalogUpdatedAt     DateTime?
@@ -102,6 +103,7 @@ enum MealPlanStatus {
   CONFIRMED
   ORDERED
   COMPLETED
+  ARCHIVED
 }
 
 enum OrderStatus {

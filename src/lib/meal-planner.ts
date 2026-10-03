@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { UserPreferences } from "@prisma/client";
 import type { CatalogProduct } from "./rohlik-catalog";
+import { APPLIANCE_LABELS } from "./appliance";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -36,6 +37,7 @@ export interface Recipe {
   ingredients: { name: string; amount: string }[];
   steps: string[];
   calories: number;
+  applianceSuitable?: boolean;
 }
 
 export interface DayMeals {
@@ -51,6 +53,7 @@ export interface WeeklyMealPlan {
 }
 
 function buildSystemPrompt(prefs: UserPreferences, catalog?: CatalogProduct[], previousMeals?: string[]): string {
+  const appliance = APPLIANCE_LABELS[prefs.kitchenAppliance];
   const diets: string[] = [];
   if (prefs.isVegetarian) diets.push("vegetariánská");
   if (prefs.isVegan) diets.push("veganská");
@@ -86,6 +89,7 @@ PRAVIDLA:
 - Jídla musí být MAXIMÁLNĚ ROZMANITÁ — každé jídlo musí být zcela jiné (jiný typ masa, jiná příloha, jiný způsob přípravy)
 - České názvy ingrediencí
 - Nákupní seznam musí být přesný s množstvím
+${appliance ? `- Uživatel vaří s ${appliance}. PREFERUJ jídla, která jdou v ${appliance} připravit (polévky, omáčky, dušená a kašovitá jídla, rizota, dušená masa, dezerty, pomazánky, pečivo z těsta). Nevnucuj ale robot jídlům, která v něm nedávají smysl (smažení, grilování, pečení na plechu apod.). U každého receptu nastav applianceSuitable: true, pokud jde jídlo v ${appliance} celé připravit, jinak false.` : ""}
 ${catalog && catalog.length > 0 ? `- PŘEDNOSTNĚ používej tyto reálně dostupné produkty z Rohlík.cz (u každého je #ID):
 ${catalog.map((p) => `  #${p.id} ${p.name} (${p.amount}, ${p.price}Kč)`).join("\n")}
 - U každé položky nákupního seznamu, která odpovídá produktu z tohoto seznamu, VYPLŇ jeho rohlikId, rohlikName a rohlikPrice přesně podle seznamu výše. Pouze pokud pro položku v seznamu opravdu není žádný vhodný produkt, nastav rohlikId na null.` : "- Ingredience musí být dostupné na Rohlík.cz"}
@@ -136,7 +140,8 @@ ${days.map((d) => `    "${d}": { ${meals.map((m) => `"${m}": "název"`).join(", 
       "servings": ${prefs.householdSize},
       "ingredients": [{ "name": "ingredience", "amount": "200g" }],
       "steps": ["Krok 1.", "Krok 2.", "Krok 3."],
-      "calories": 400
+      "calories": 400,
+      "applianceSuitable": false
     }
   },
   "shoppingList": [

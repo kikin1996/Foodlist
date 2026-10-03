@@ -15,6 +15,7 @@ export default async function DashboardPage() {
     include: {
       preferences: true,
       mealPlans: {
+        where: { status: { not: "ARCHIVED" } },
         orderBy: { createdAt: "desc" },
         take: 1,
         include: { orders: { orderBy: { createdAt: "desc" }, take: 1 } },
@@ -39,6 +40,9 @@ export default async function DashboardPage() {
             <span className="font-bold text-gray-900">Kostki</span>
           </div>
           <nav className="flex items-center gap-6">
+            <Link href="/history" className="text-sm text-gray-500 hover:text-gray-900">
+              Historie
+            </Link>
             <Link href="/catalog" className="text-sm text-gray-500 hover:text-gray-900">
               Katalog potravin
             </Link>
@@ -187,7 +191,7 @@ export default async function DashboardPage() {
 
         {/* Meal plan or generate */}
         {currentPlan ? (
-          <MealPlanView plan={currentPlan} />
+          <MealPlanView plan={currentPlan} kitchenAppliance={user.preferences.kitchenAppliance} />
         ) : (
           <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
             <div className="text-5xl mb-4">🥗</div>
@@ -206,7 +210,10 @@ export default async function DashboardPage() {
         {currentPlan && (
           <div className="mt-6 flex items-center justify-between">
             <ResetPlanButton />
-            <GeneratePlanButton label="Vygenerovat nový jídelníček" />
+            <GeneratePlanButton
+              label="Schovat do historie a vygenerovat další týden"
+              archiveId={currentPlan.id}
+            />
           </div>
         )}
       </main>

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 
 interface Props {
   label?: string;
+  archiveId?: string;
 }
 
-export default function GeneratePlanButton({ label = "Vygenerovat jídelníček" }: Props) {
+export default function GeneratePlanButton({ label = "Vygenerovat jídelníček", archiveId }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -16,7 +17,11 @@ export default function GeneratePlanButton({ label = "Vygenerovat jídelníček"
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/meal-plan/generate", { method: "POST" });
+      const res = await fetch("/api/meal-plan/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archiveId }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Generování selhalo");
       router.refresh();

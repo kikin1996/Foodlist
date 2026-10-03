@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateMealPlan } from "@/lib/meal-planner";
@@ -7,11 +7,14 @@ import { decrypt } from "@/lib/encryption";
 
 export const maxDuration = 120;
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Nepřihlášen" }, { status: 401 });
   }
+
+  const body = (await req.json().catch(() => null)) as { archiveId?: string } | null;
+  const archiveId = body?.archiveId;
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -20,6 +23,13 @@ export async function POST() {
 
   if (!user?.preferences) {
     return NextResponse.json({ error: "Nejprve nastavte preference" }, { status: 400 });
+  }
+
+  const archivedPlan = archiveId
+    ? await prisma.mealPlan.findFirst({ where: { id: archiveId, userId: session.user.id } })
+    : null;
+  if (archiveId && !archivedPlan) {
+    return NextResponse.json({ error: "Jídelníček k archivaci nenalezen" }, { status: 404 });
   }
 
   try {
@@ -91,20 +101,29 @@ export async function POST() {
       }
     }
 
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+    const weekStart = archivedPlan ? new Date(archivedPlan.weekStart) : new Date();
+    if (!archivedPlan) {
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+    } else {
+      weekStart.setDate(weekStart.getDate() + 7);
+    }
     weekStart.setHours(0, 0, 0, 0);
 
-    const plan = await prisma.mealPlan.create({
-      data: {
-        userId: session.user.id,
-        weekStart,
-        meals: weekPlan.meals as object,
-        recipes: weekPlan.recipes as object,
-        shoppingList: weekPlan.shoppingList as unknown as object[],
-        status: "DRAFT",
-      },
-    });
+    const [plan] = await prisma.$transaction([
+      prisma.mealPlan.create({
+        data: {
+          userId: session.user.id,
+          weekStart,
+          meals: weekPlan.meals as object,
+          recipes: weekPlan.recipes as object,
+          shoppingList: weekPlan.shoppingList as unknown as object[],
+          status: "DRAFT",
+        },
+      }),
+      ...(archivedPlan
+        ? [prisma.mealPlan.update({ where: { id: archivedPlan.id }, data: { status: "ARCHIVED" } })]
+        : []),
+    ]);
 
     return NextResponse.json({
       id: plan.id,

@@ -50,8 +50,15 @@ interface Props {
     includedMeals: string;
     includedDays: string;
     aiModel: string;
+    kitchenAppliance: string;
   };
 }
+
+const APPLIANCES = [
+  { value: "none", label: "Žádný", desc: "Klasické vaření" },
+  { value: "thermomix", label: "Thermomix", desc: "Recepty s nastavením" },
+  { value: "monsieur_cuisine", label: "Monsieur Cuisine", desc: "Recepty s nastavením" },
+];
 
 export default function PreferencesForm({ initialData }: Props) {
   const router = useRouter();
@@ -269,6 +276,28 @@ export default function PreferencesForm({ initialData }: Props) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">Chytrý kuchyňský robot</label>
+          <div className="grid grid-cols-3 gap-3">
+            {APPLIANCES.map((a) => (
+              <button
+                key={a.value}
+                type="button"
+                onClick={() => setForm({ ...form, kitchenAppliance: a.value })}
+                className={`p-3 rounded-xl border-2 text-left transition-colors ${
+                  form.kitchenAppliance === a.value
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="font-semibold text-gray-900 text-sm">{a.label}</div>
+                <div className="text-xs text-gray-500">{a.desc}</div>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5">Jídla vhodná pro robot se budou preferovat, ale jen tam, kde to dává smysl. U takových receptů pak půjde převést postup na robot.</p>
         </div>
 
         <div>

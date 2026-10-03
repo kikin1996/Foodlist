@@ -24,6 +24,7 @@ const schema = z.object({
   includedMeals: z.string().optional(),
   includedDays: z.string().optional(),
   aiModel: z.enum(["gpt-5-nano", "gpt-5-mini", "gpt-5.1"]).optional(),
+  kitchenAppliance: z.enum(["none", "thermomix", "monsieur_cuisine"]).optional(),
   rohlikEmail: z.string().optional(),
   rohlikPassword: z.string().optional(),
 });

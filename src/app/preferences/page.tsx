@@ -51,6 +51,7 @@ export default async function PreferencesPage() {
             includedMeals: user.preferences?.includedMeals ?? "breakfast,lunch,dinner",
             includedDays: user.preferences?.includedDays ?? "pondeli,utery,streda,ctvrtek,patek,sobota,nedele",
             aiModel: user.preferences?.aiModel ?? "gpt-5-mini",
+            kitchenAppliance: user.preferences?.kitchenAppliance ?? "none",
           }}
         />
       </main>

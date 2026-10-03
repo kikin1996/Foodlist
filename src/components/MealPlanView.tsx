@@ -25,7 +25,13 @@ const MEAL_ICONS: Record<string, string> = {
   dinner: "🌙",
 };
 
+const APPLIANCE_NAMES: Record<string, string> = {
+  thermomix: "Thermomix",
+  monsieur_cuisine: "Monsieur Cuisine",
+};
+
 interface MealPlanViewProps {
+  kitchenAppliance?: string;
   plan: {
     id: string;
     meals: unknown;
@@ -36,9 +42,12 @@ interface MealPlanViewProps {
   };
 }
 
-export default function MealPlanView({ plan }: MealPlanViewProps) {
+export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPlanViewProps) {
   const [activeTab, setActiveTab] = useState<"meals" | "shopping" | "recipes">("meals");
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const [applianceVersions, setApplianceVersions] = useState<Record<string, { steps: string[] }>>({});
+  const [applianceLoading, setApplianceLoading] = useState(false);
+  const [applianceError, setApplianceError] = useState("");
 
   function toggleCategory(cat: string) {
     setOpenCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -49,7 +58,7 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
   const recipes = plan.recipes as Record<string, {
     name: string; time: number; servings: number;
     ingredients: { name: string; amount: string }[];
-    steps: string[]; calories: number;
+    steps: string[]; calories: number; applianceSuitable?: boolean;
   }>;
   const shoppingList = plan.shoppingList as {
     name: string; amount: string; unit: string; category: string; rohlikUrl?: string;
@@ -77,6 +86,30 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
   };
 
   const recipe = selectedRecipe ? recipes[selectedRecipe] : null;
+  const applianceName = APPLIANCE_NAMES[kitchenAppliance];
+  const applianceVersion = selectedRecipe
+    ? applianceVersions[selectedRecipe] ?? (recipe as { applianceVersion?: { steps: string[] } } | null)?.applianceVersion
+    : undefined;
+
+  async function convertForAppliance() {
+    if (!selectedRecipe) return;
+    setApplianceLoading(true);
+    setApplianceError("");
+    try {
+      const res = await fetch(`/api/meal-plan/${plan.id}/appliance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeName: selectedRecipe }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Převod selhal");
+      setApplianceVersions((prev) => ({ ...prev, [selectedRecipe]: data }));
+    } catch (err) {
+      setApplianceError(err instanceof Error ? err.message : "Chyba");
+    } finally {
+      setApplianceLoading(false);
+    }
+  }
   const order = plan.orders[0];
 
   return (
@@ -224,6 +257,35 @@ export default function MealPlanView({ plan }: MealPlanViewProps) {
                 <span>👥 {recipe.servings} osob</span>
                 <span>🔥 ~{recipe.calories} kcal/porce</span>
               </div>
+
+              {recipe.applianceSuitable && applianceName && (
+                <div className="mb-6">
+                  {!applianceVersion ? (
+                    <button
+                      onClick={convertForAppliance}
+                      disabled={applianceLoading}
+                      className="px-4 py-2 border border-brand-500 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-50 disabled:opacity-50 transition-colors"
+                    >
+                      {applianceLoading ? "Převádím…" : `Předělat pro ${applianceName}`}
+                    </button>
+                  ) : (
+                    <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Postup pro {applianceName}</h4>
+                      <ol className="space-y-3">
+                        {applianceVersion.steps.map((step, i) => (
+                          <li key={i} className="flex gap-3 text-sm text-gray-700">
+                            <span className="w-6 h-6 rounded-full bg-white text-brand-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+                              {i + 1}
+                            </span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  {applianceError && <p className="text-sm text-red-600 mt-2">{applianceError}</p>}
+                </div>
+              )}
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
