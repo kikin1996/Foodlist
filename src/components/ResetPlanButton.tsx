@@ -18,20 +18,17 @@ export default function ResetPlanButton() {
 
   if (confirm) {
     return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">Smazat jídelníček?</span>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <span className="font-semibold text-tomato-600">Opravdu smazat celý týden?</span>
         <button
           onClick={handleReset}
           disabled={loading}
-          className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className="bg-tomato-600 px-4 py-2 font-semibold text-white hover:bg-tomato-500 disabled:opacity-50"
         >
-          {loading ? "Mažu..." : "Ano, smazat"}
+          {loading ? "Mažu…" : "Smazat"}
         </button>
-        <button
-          onClick={() => setConfirm(false)}
-          className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Zrušit
+        <button onClick={() => setConfirm(false)} className="font-semibold text-gray-600 hover:text-gray-900">
+          Zpět
         </button>
       </div>
     );
@@ -40,9 +37,9 @@ export default function ResetPlanButton() {
   return (
     <button
       onClick={() => setConfirm(true)}
-      className="px-3 py-1.5 border border-gray-200 text-gray-500 text-sm rounded-lg hover:bg-gray-50 hover:text-red-600 hover:border-red-200 transition-colors"
+      className="text-sm font-semibold text-gray-500 underline underline-offset-4 hover:text-tomato-600"
     >
-      🗑 Smazat jídelníček
+      Smazat tento týden
     </button>
   );
 }

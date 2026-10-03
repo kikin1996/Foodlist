@@ -1,19 +1,21 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import RefreshCatalogButton from "@/components/RefreshCatalogButton";
+import AppHeader from "@/components/AppHeader";
 import type { CatalogProduct } from "@/lib/rohlik-catalog";
 
 const CAT_LABELS: Record<string, string> = {
-  maso: "🥩 Maso & ryby",
-  mlecne: "🥛 Mléčné & vejce",
-  zelenina: "🥬 Zelenina",
-  ovoce: "🍎 Ovoce",
-  pecivo: "🍞 Pečivo",
-  suche: "🫘 Suché potraviny",
-  ostatni: "🫙 Konzervy & oleje",
+  maso: "Maso a ryby",
+  mlecne: "Mléčné a vejce",
+  zelenina: "Zelenina",
+  ovoce: "Ovoce",
+  pecivo: "Pečivo",
+  suche: "Suché potraviny",
+  ostatni: "Konzervy a oleje",
 };
+
+const CAT_ORDER = ["zelenina", "ovoce", "maso", "mlecne", "pecivo", "suche", "ostatni"];
 
 export default async function CatalogPage() {
   const session = await auth();
@@ -32,71 +34,54 @@ export default async function CatalogPage() {
     (byCat[p.category] ??= []).push(p);
   }
 
-  const catOrder = ["zelenina", "ovoce", "maso", "mlecne", "pecivo", "suche", "ostatni"];
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">K</span>
-            </div>
-            <span className="font-bold text-gray-900">Kostki</span>
-          </Link>
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">
-            ← Zpět na dashboard
-          </Link>
-        </div>
-      </header>
+    <div className="min-h-screen">
+      <AppHeader current="/catalog" />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="flex items-start justify-between mb-6">
+      <main className="mx-auto max-w-5xl px-5 py-10">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dostupné potraviny z Rohlík.cz</h1>
-            <p className="text-gray-500 mt-1 text-sm">
+            <h1 className="text-4xl font-extrabold">Katalog</h1>
+            <p className="mt-2 text-gray-600">
               {catalog.length > 0
-                ? `${catalog.length} produktů · aktualizováno ${updatedAt ? new Date(updatedAt).toLocaleDateString("cs", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "nikdy"}`
-                : "Katalog zatím nebyl stažen"}
+                ? `${catalog.length} produktů skladem. Aktualizováno ${
+                    updatedAt
+                      ? new Date(updatedAt).toLocaleString("cs-CZ", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })
+                      : "nikdy"
+                  }.`
+                : "Katalog zatím nebyl stažen."}
             </p>
           </div>
           <RefreshCatalogButton />
         </div>
 
         {catalog.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <div className="text-5xl mb-4">🛒</div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Katalog není stažen</h2>
-            <p className="text-gray-500 text-sm mb-4">
-              Klikněte na tlačítko &quot;Aktualizovat katalog&quot; výše. Katalog se stáhne z Rohlík.cz
-              a použije se při generování jídelníčku.
-            </p>
-          </div>
+          <p className="mt-10 max-w-md leading-relaxed text-gray-600">
+            Katalog se stáhne z Rohlík.cz a použije se při sestavování jídelníčku. Stačí kliknout na
+            Aktualizovat katalog. Potřebujete k tomu uložený účet v Nastavení.
+          </p>
         ) : (
-          <div className="space-y-4">
-            {catOrder.map((cat) => {
+          <div className="mt-10 grid gap-x-10 md:grid-cols-2">
+            {CAT_ORDER.map((cat) => {
               const items = byCat[cat] ?? [];
               if (items.length === 0) return null;
               return (
-                <div key={cat} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                  <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                    <span className="font-semibold text-gray-800">{CAT_LABELS[cat] ?? cat}</span>
-                    <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-200">
-                      {items.length} produktů
-                    </span>
+                <section key={cat} className="border-t-2 border-gray-900 py-5">
+                  <div className="flex items-baseline justify-between">
+                    <h2 className="font-display text-xl font-bold">{CAT_LABELS[cat] ?? cat}</h2>
+                    <span className="text-sm text-gray-500">{items.length}</span>
                   </div>
-                  <div className="divide-y divide-gray-50">
+                  <ul className="mt-4 divide-y divide-gray-200">
                     {items.map((p) => (
-                      <div key={p.id} className="px-5 py-2.5 flex items-center justify-between">
-                        <span className="text-sm text-gray-700">{p.name}</span>
-                        <div className="flex items-center gap-3 text-xs text-gray-400">
-                          <span>{p.amount}</span>
-                          <span className="font-medium text-gray-600">{Math.round(p.price)} Kč</span>
-                        </div>
-                      </div>
+                      <li key={p.id} className="flex items-baseline justify-between gap-4 py-2.5 text-[0.95rem]">
+                        <span>{p.name}</span>
+                        <span className="whitespace-nowrap text-sm text-gray-600">
+                          {p.amount}, {Math.round(p.price)} Kč
+                        </span>
+                      </li>
                     ))}
-                  </div>
-                </div>
+                  </ul>
+                </section>
               );
             })}
           </div>

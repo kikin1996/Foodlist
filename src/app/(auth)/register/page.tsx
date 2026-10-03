@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { errorBox, field, label, primaryButton, textLink } from "@/components/ui";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,11 +16,11 @@ export default function RegisterPage() {
     setError("");
 
     if (form.password !== form.confirmPassword) {
-      setError("Hesla se neshodují");
+      setError("Hesla se neshodují.");
       return;
     }
     if (form.password.length < 8) {
-      setError("Heslo musí mít alespoň 8 znaků");
+      setError("Heslo musí mít alespoň 8 znaků.");
       return;
     }
 
@@ -31,95 +32,81 @@ export default function RegisterPage() {
         body: JSON.stringify({ name: form.name, email: form.email, password: form.password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Registrace selhala");
+      if (!res.ok) throw new Error(data.error || "Účet se nepodařilo vytvořit.");
       router.push("/login?registered=1");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Nastala chyba");
+      setError(err instanceof Error ? err.message : "Něco se pokazilo. Zkuste to znovu.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold">F</span>
-            </div>
-            <span className="font-bold text-gray-900 text-xl">Kostki</span>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Vytvořit účet</h1>
-          <p className="text-gray-500 mt-1">Začněte jíst zdravě bez starostí</p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center px-5 py-12">
+      <div className="w-full max-w-sm">
+        <Link href="/" className="font-display text-2xl font-extrabold text-brand-600">
+          Kostki
+        </Link>
+        <h1 className="mt-10 text-3xl font-extrabold">Vytvořit účet</h1>
+        <p className="mt-2 text-gray-600">Trvá to minutu. Účet na Rohlík.cz nepotřebujete.</p>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-5">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          {error && <div className={errorBox}>{error}</div>}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Jméno</label>
+            <label className={label}>Jméno</label>
             <input
               type="text"
               required
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+              className={field}
               placeholder="Jan Novák"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className={label}>Email</label>
             <input
               type="email"
               required
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+              className={field}
               placeholder="jan@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Heslo</label>
+            <label className={label}>Heslo</label>
             <input
               type="password"
               required
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
-              placeholder="min. 8 znaků"
+              className={field}
+              placeholder="alespoň 8 znaků"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Potvrdit heslo</label>
+            <label className={label}>Heslo znovu</label>
             <input
               type="password"
               required
               value={form.confirmPassword}
               onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
-              placeholder="znovu heslo"
+              className={field}
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? "Registrace..." : "Vytvořit účet"}
+          <button type="submit" disabled={loading} className={`${primaryButton} w-full`}>
+            {loading ? "Vytvářím účet…" : "Vytvořit účet"}
           </button>
 
-          <p className="text-center text-sm text-gray-500">
-            Máte účet?{" "}
-            <Link href="/login" className="text-brand-600 font-medium hover:underline">
+          <p className="text-sm text-gray-600">
+            Už účet máte?{" "}
+            <Link href="/login" className={textLink}>
               Přihlásit se
             </Link>
           </p>

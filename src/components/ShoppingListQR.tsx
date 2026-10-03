@@ -1,37 +1,39 @@
 "use client";
 
 import { useState } from "react";
+import { secondaryButton } from "./ui";
 
 export default function ShoppingListQR({ mealPlanId }: { mealPlanId: string }) {
   const [open, setOpen] = useState(false);
   const listUrl = typeof window !== "undefined" ? `${window.location.origin}/list/${mealPlanId}` : "";
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-      >
-        📱 QR seznam
+    <div className="flex flex-col items-start gap-3">
+      <button onClick={() => setOpen((v) => !v)} className={secondaryButton} aria-expanded={open}>
+        {open ? "Skrýt QR kód" : "Ukázat QR kód"}
       </button>
       {open && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center gap-2 shadow-sm">
+        <div className="flex flex-col gap-3 border-2 border-gray-900 bg-white p-4 sm:flex-row sm:items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/meal-plan/${mealPlanId}/qrcode`}
             alt="QR kód nákupního seznamu"
-            width={200}
-            height={200}
-            className="rounded-lg"
+            width={180}
+            height={180}
           />
-          <p className="text-xs text-gray-500 text-center max-w-[220px]">
-            Naskenuj mobilem — otevře se nákupní seznam, který si můžeš uložit do fotek
-          </p>
-          {listUrl && (
-            <a href={listUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-brand-600 hover:underline">
-              nebo otevři odkaz přímo
-            </a>
-          )}
+          <div className="max-w-[16rem] space-y-2 text-sm text-gray-600">
+            <p>Naskenujte mobilem. Seznam se otevře a můžete ho uložit do fotek nebo si ho udělat screenshot.</p>
+            {listUrl && (
+              <a
+                href={listUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-brand-600 underline underline-offset-4"
+              >
+                Otevřít seznam tady
+              </a>
+            )}
+          </div>
         </div>
       )}
     </div>

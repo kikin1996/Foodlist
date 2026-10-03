@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ShoppingListQR from "./ShoppingListQR";
+import { errorBox, secondaryButton } from "./ui";
 
 const DAY_LABELS: Record<string, string> = {
   pondeli: "Pondělí",
@@ -14,21 +15,41 @@ const DAY_LABELS: Record<string, string> = {
   nedele: "Neděle",
 };
 
+const DAY_ORDER = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
+
 const MEAL_LABELS: Record<string, string> = {
   breakfast: "Snídaně",
   lunch: "Oběd",
   dinner: "Večeře",
 };
 
-const MEAL_ICONS: Record<string, string> = {
-  breakfast: "☕",
-  lunch: "🍽️",
-  dinner: "🌙",
-};
-
 const APPLIANCE_NAMES: Record<string, string> = {
   thermomix: "Thermomix",
   monsieur_cuisine: "Monsieur Cuisine",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  zelenina: "Zelenina a ovoce",
+  ovoce: "Ovoce",
+  maso: "Maso a ryby",
+  mlecne: "Mléčné",
+  pecivo: "Pečivo",
+  suche: "Suché potraviny",
+  napoje: "Nápoje",
+  ostatni: "Ostatní",
+};
+
+type Tab = "meals" | "shopping" | "recipes";
+
+type RecipeData = {
+  name: string;
+  time: number;
+  servings: number;
+  ingredients: { name: string; amount: string }[];
+  steps: string[];
+  calories: number;
+  applianceSuitable?: boolean;
+  applianceVersion?: { steps: string[] };
 };
 
 interface MealPlanViewProps {
@@ -39,19 +60,33 @@ interface MealPlanViewProps {
     recipes: unknown;
     shoppingList: unknown;
     status: string;
-    orders: { id: string; status: string; rohlikOrderUrl?: string | null; estimatedTotal?: number | null }[];
   };
 }
 
 export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPlanViewProps) {
-  const [activeTab, setActiveTab] = useState<"meals" | "shopping" | "recipes">("meals");
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>("meals");
+  const [closedCategories, setClosedCategories] = useState<Record<string, boolean>>({});
+  const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
   const [applianceVersions, setApplianceVersions] = useState<Record<string, { steps: string[] }>>({});
   const [applianceLoading, setApplianceLoading] = useState(false);
   const [applianceError, setApplianceError] = useState("");
   const [regenSlot, setRegenSlot] = useState<string | null>(null);
   const [regenError, setRegenError] = useState("");
-  const router = useRouter();
+
+  const meals = plan.meals as Record<string, Record<string, string>>;
+  const recipes = plan.recipes as Record<string, RecipeData>;
+  const shoppingList = plan.shoppingList as {
+    name: string; amount: string; unit: string; category: string; rohlikUrl?: string;
+  }[];
+
+  const days = Object.keys(meals).sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
+  const categories = Array.from(new Set(shoppingList.map((i) => i.category)));
+  const recipe = selectedRecipe ? recipes[selectedRecipe] : null;
+  const applianceName = APPLIANCE_NAMES[kitchenAppliance];
+  const applianceVersion = selectedRecipe
+    ? applianceVersions[selectedRecipe] ?? recipe?.applianceVersion
+    : undefined;
 
   async function regenerateSlot(day: string, meal: string) {
     setRegenSlot(`${day}:${meal}`);
@@ -63,56 +98,14 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
         body: JSON.stringify({ day, meal }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Přegenerování selhalo");
+      if (!res.ok) throw new Error(data?.error ?? "Přegenerování se nepovedlo.");
       router.refresh();
     } catch (err) {
-      setRegenError(err instanceof Error ? err.message : "Chyba");
+      setRegenError(err instanceof Error ? err.message : "Něco se pokazilo.");
     } finally {
       setRegenSlot(null);
     }
   }
-
-  function toggleCategory(cat: string) {
-    setOpenCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
-  }
-  const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
-
-  const meals = plan.meals as Record<string, Record<string, string>>;
-  const recipes = plan.recipes as Record<string, {
-    name: string; time: number; servings: number;
-    ingredients: { name: string; amount: string }[];
-    steps: string[]; calories: number; applianceSuitable?: boolean;
-  }>;
-  const shoppingList = plan.shoppingList as {
-    name: string; amount: string; unit: string; category: string; rohlikUrl?: string;
-  }[];
-
-  const DAY_ORDER = ["pondeli", "utery", "streda", "ctvrtek", "patek", "sobota", "nedele"];
-  const days = Object.keys(meals).sort(
-    (a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b)
-  );
-
-  const categories = Array.from(new Set(shoppingList.map((i) => i.category)));
-
-  const categoryLabels: Record<string, string> = {
-    zelenina: "Zelenina",
-    ovoce: "Ovoce",
-    maso: "Maso & ryby",
-    mlecne: "Mléčné výrobky",
-    pecivo: "Pečivo",
-    suche: "Suchá trvanlivá",
-    ostatni: "Ostatní",
-  };
-
-  const categoryIcons: Record<string, string> = {
-    zelenina: "🥬", ovoce: "🍎", maso: "🥩", mlecne: "🥛", pecivo: "🍞", suche: "🫘", ostatni: "🛍️",
-  };
-
-  const recipe = selectedRecipe ? recipes[selectedRecipe] : null;
-  const applianceName = APPLIANCE_NAMES[kitchenAppliance];
-  const applianceVersion = selectedRecipe
-    ? applianceVersions[selectedRecipe] ?? (recipe as { applianceVersion?: { steps: string[] } } | null)?.applianceVersion
-    : undefined;
 
   async function convertForAppliance() {
     if (!selectedRecipe) return;
@@ -125,136 +118,130 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
         body: JSON.stringify({ recipeName: selectedRecipe }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Převod selhal");
+      if (!res.ok) throw new Error(data?.error ?? "Převod se nepovedl.");
       setApplianceVersions((prev) => ({ ...prev, [selectedRecipe]: data }));
     } catch (err) {
-      setApplianceError(err instanceof Error ? err.message : "Chyba");
+      setApplianceError(err instanceof Error ? err.message : "Něco se pokazilo.");
     } finally {
       setApplianceLoading(false);
     }
   }
-  const order = plan.orders[0];
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "meals", label: "Jídelníček" },
+    { key: "shopping", label: `Nákup (${shoppingList.length})` },
+    { key: "recipes", label: `Recepty (${Object.keys(recipes).length})` },
+  ];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100">
-        {(["meals", "shopping", "recipes"] as const).map((tab) => (
+    <div>
+      <div role="tablist" className="flex gap-7 border-b-2 border-gray-900">
+        {tabs.map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-4 text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? "text-brand-700 border-b-2 border-brand-600"
-                : "text-gray-500 hover:text-gray-700"
+            key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            onClick={() => {
+              setActiveTab(tab.key);
+              setSelectedRecipe(null);
+            }}
+            className={`-mb-0.5 border-b-4 pb-3 text-base font-semibold transition-colors ${
+              activeTab === tab.key
+                ? "border-brand-600 text-brand-600"
+                : "border-transparent text-gray-500 hover:text-gray-900"
             }`}
           >
-            {tab === "meals" ? "📅 Jídelníček" : tab === "shopping" ? "🛒 Nákupní seznam" : "📖 Recepty"}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Meals tab */}
       {activeTab === "meals" && (
-        <div className="divide-y divide-gray-50">
-          {regenError && <p className="p-4 text-sm text-red-600">{regenError}</p>}
+        <div className="mt-2">
+          {regenError && <p className={`${errorBox} mt-4`}>{regenError}</p>}
           {days.map((day) => (
-            <div key={day} className="p-5">
-              <div className="font-semibold text-gray-900 mb-3">
-                {DAY_LABELS[day] ?? day}
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {(["breakfast", "lunch", "dinner"] as const).map((meal) => (
-                  <div key={meal} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-400">
-                        {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
-                      </span>
+            <div
+              key={day}
+              className="grid gap-3 border-b border-gray-200 py-6 md:grid-cols-[9rem_1fr] md:gap-8"
+            >
+              <h3 className="text-2xl">{DAY_LABELS[day] ?? day}</h3>
+              <div className="grid gap-5 sm:grid-cols-3">
+                {(["breakfast", "lunch", "dinner"] as const).map((meal) => {
+                  const name = meals[day]?.[meal];
+                  const busy = regenSlot === `${day}:${meal}`;
+                  return (
+                    <div key={meal} className="min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-gray-500">{MEAL_LABELS[meal]}</span>
+                        <button
+                          onClick={() => regenerateSlot(day, meal)}
+                          disabled={regenSlot !== null}
+                          aria-label={`Přegenerovat: ${MEAL_LABELS[meal]}, ${DAY_LABELS[day] ?? day}`}
+                          title="Přegenerovat toto jídlo"
+                          className="flex h-7 w-7 items-center justify-center border border-gray-300 text-base text-gray-500 hover:border-brand-600 hover:text-brand-600 disabled:opacity-40"
+                        >
+                          {busy ? "…" : "↻"}
+                        </button>
+                      </div>
                       <button
-                        onClick={() => regenerateSlot(day, meal)}
-                        disabled={regenSlot !== null}
-                        title="Přegenerovat toto jídlo"
-                        className="w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-brand-600 hover:bg-white text-sm disabled:opacity-40"
+                        onClick={() => {
+                          if (name && recipes[name]) {
+                            setSelectedRecipe(name);
+                            setActiveTab("recipes");
+                          }
+                        }}
+                        className="mt-1.5 text-left text-[1.05rem] font-semibold leading-snug text-gray-900 hover:text-brand-600"
                       >
-                        {regenSlot === `${day}:${meal}` ? "…" : "↻"}
+                        {name ?? "–"}
                       </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        if (meals[day]?.[meal] && recipes[meals[day][meal]]) {
-                          setSelectedRecipe(meals[day][meal]);
-                          setActiveTab("recipes");
-                        }
-                      }}
-                      className="text-sm text-gray-800 font-medium text-left hover:text-brand-600 transition-colors"
-                    >
-                      {meals[day]?.[meal] ?? "–"}
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Shopping tab */}
       {activeTab === "shopping" && (
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="font-semibold text-gray-900">Nákupní seznam</h3>
-              <p className="text-sm text-gray-500">{shoppingList.length} položek</p>
-            </div>
-            <div className="flex items-start gap-2">
-              <ShoppingListQR mealPlanId={plan.id} />
-            </div>
-            {order?.status === "CART_FILLED" && order.estimatedTotal && (
-              <div className="text-sm text-gray-500">
-                Odhadovaná cena: <strong>{order.estimatedTotal.toLocaleString("cs")} Kč</strong>
-              </div>
-            )}
+        <div className="mt-8">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <p className="text-gray-600">
+              {shoppingList.length} položek. Naskenujte QR kód v mobilu nebo si seznam uložte.
+            </p>
+            <ShoppingListQR mealPlanId={plan.id} />
           </div>
 
-          <div className="space-y-2">
+          <div className="mt-8 divide-y divide-gray-200 border-y border-gray-200">
             {categories.map((cat) => {
               const items = shoppingList.filter((i) => i.category === cat);
-              const isOpen = !!openCategories[cat];
+              const open = !closedCategories[cat];
               return (
-                <div key={cat} className="border border-gray-100 rounded-xl overflow-hidden">
+                <section key={cat} className="py-5">
                   <button
-                    onClick={() => toggleCategory(cat)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    onClick={() => setClosedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }))}
+                    aria-expanded={open}
+                    className="flex w-full items-baseline justify-between text-left"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{categoryIcons[cat]}</span>
-                      <span className="font-medium text-gray-800 text-sm">
-                        {categoryLabels[cat] ?? cat}
-                      </span>
-                      <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border border-gray-200">
-                        {items.length}
-                      </span>
-                    </div>
-                    <span className={`text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}>
-                      ▾
+                    <span className="font-display text-xl font-bold">{CATEGORY_LABELS[cat] ?? cat}</span>
+                    <span className="text-sm text-gray-500">
+                      {items.length} {open ? "skrýt" : "zobrazit"}
                     </span>
                   </button>
-                  {isOpen && (
-                    <div className="divide-y divide-gray-50">
+                  {open && (
+                    <ul className="mt-4 space-y-3">
                       {items.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between px-4 py-2.5"
-                        >
-                          <span className="text-sm text-gray-700 flex items-center gap-1.5">
+                        <li key={idx} className="flex items-baseline justify-between gap-4">
+                          <span className="flex flex-wrap items-baseline gap-x-2 text-[0.95rem] text-gray-900">
                             {item.name}
                             {item.rohlikUrl && (
                               <a
                                 href={item.rohlikUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title="Zobrazit na Rohlík.cz"
-                                className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 hover:text-brand-600 hover:border-brand-400 text-[10px] font-semibold"
+                                title="Zobrazit produkt na Rohlík.cz"
+                                aria-label={`Zobrazit ${item.name} na Rohlík.cz`}
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-brand-600 text-[10px] font-bold text-brand-600 hover:bg-brand-600 hover:text-white"
                               >
                                 i
                               </a>
@@ -265,119 +252,124 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title="Hledat na Rohlík.cz"
-                                className="text-xs opacity-60 hover:opacity-100"
+                                aria-label={`Hledat ${item.name} na Rohlík.cz`}
+                                className="inline-flex h-4 w-4 items-center justify-center text-gray-400 hover:text-brand-600"
                               >
-                                🔍
+                                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                                  <circle cx="7" cy="7" r="4.5" />
+                                  <path d="M10.5 10.5L14 14" strokeLinecap="round" />
+                                </svg>
                               </a>
                             )}
                           </span>
-                          <span className="text-sm text-gray-500 font-medium">
+                          <span className="whitespace-nowrap text-sm text-gray-600">
                             {item.amount} {item.unit}
                           </span>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
-                </div>
+                </section>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Recipes tab */}
       {activeTab === "recipes" && (
-        <div className="p-6">
+        <div className="mt-8">
           {recipe ? (
-            <div>
+            <article>
               <button
                 onClick={() => setSelectedRecipe(null)}
-                className="text-sm text-brand-600 hover:underline mb-4 flex items-center gap-1"
+                className="text-sm font-semibold text-brand-600 underline underline-offset-4"
               >
-                ← Zpět na recepty
+                Zpět na recepty
               </button>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">{recipe.name}</h3>
-              <div className="flex gap-4 text-sm text-gray-500 mb-6">
-                <span>⏱️ {recipe.time} min</span>
-                <span>👥 {recipe.servings} osob</span>
-                <span>🔥 ~{recipe.calories} kcal/porce</span>
-              </div>
+              <h3 className="mt-6 text-3xl font-extrabold md:text-4xl">{recipe.name}</h3>
+              <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm text-gray-600">
+                <div>
+                  <dt className="inline">Čas: </dt>
+                  <dd className="inline font-semibold text-gray-900">{recipe.time} min</dd>
+                </div>
+                <div>
+                  <dt className="inline">Porce: </dt>
+                  <dd className="inline font-semibold text-gray-900">{recipe.servings}</dd>
+                </div>
+                <div>
+                  <dt className="inline">Energie: </dt>
+                  <dd className="inline font-semibold text-gray-900">{recipe.calories} kcal</dd>
+                </div>
+              </dl>
 
               {recipe.applianceSuitable && applianceName && (
-                <div className="mb-6">
+                <div className="mt-6">
                   {!applianceVersion ? (
                     <button
                       onClick={convertForAppliance}
                       disabled={applianceLoading}
-                      className="px-4 py-2 border border-brand-500 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-50 disabled:opacity-50 transition-colors"
+                      className={secondaryButton}
                     >
                       {applianceLoading ? "Převádím…" : `Předělat pro ${applianceName}`}
                     </button>
                   ) : (
-                    <div className="bg-brand-50 border border-brand-100 rounded-xl p-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Postup pro {applianceName}</h4>
-                      <ol className="space-y-3">
+                    <div className="border-l-4 border-brand-600 bg-brand-50 p-5">
+                      <h4 className="font-display text-xl font-bold">Postup pro {applianceName}</h4>
+                      <ol className="mt-4 space-y-3">
                         {applianceVersion.steps.map((step, i) => (
-                          <li key={i} className="flex gap-3 text-sm text-gray-700">
-                            <span className="w-6 h-6 rounded-full bg-white text-brand-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
-                              {i + 1}
-                            </span>
+                          <li key={i} className="flex gap-4 text-[0.95rem] leading-relaxed">
+                            <span className="font-display font-bold text-brand-600">{i + 1}</span>
                             <span>{step}</span>
                           </li>
                         ))}
                       </ol>
                     </div>
                   )}
-                  {applianceError && <p className="text-sm text-red-600 mt-2">{applianceError}</p>}
+                  {applianceError && <p className={`${errorBox} mt-3`}>{applianceError}</p>}
                 </div>
               )}
 
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="mt-10 grid gap-10 md:grid-cols-[1fr_1.4fr]">
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Ingredience</h4>
-                  <ul className="space-y-2">
+                  <h4 className="font-display text-xl font-bold">Ingredience</h4>
+                  <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
                     {recipe.ingredients.map((ing, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+                      <li key={i} className="flex justify-between gap-4 py-2.5 text-[0.95rem]">
                         <span>{ing.name}</span>
-                        <span className="text-gray-400 ml-auto">{ing.amount}</span>
+                        <span className="whitespace-nowrap text-gray-600">{ing.amount}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">Postup</h4>
-                  <ol className="space-y-3">
+                  <h4 className="font-display text-xl font-bold">Postup</h4>
+                  <ol className="mt-4 space-y-4">
                     {recipe.steps.map((step, i) => (
-                      <li key={i} className="flex gap-3 text-sm text-gray-700">
-                        <span className="w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
+                      <li key={i} className="flex gap-4 text-[0.95rem] leading-relaxed">
+                        <span className="font-display font-bold text-brand-600">{i + 1}</span>
                         <span>{step}</span>
                       </li>
                     ))}
                   </ol>
                 </div>
               </div>
-            </div>
+            </article>
           ) : (
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-4">Všechny recepty</h3>
-              <div className="grid md:grid-cols-2 gap-3">
-                {Object.entries(recipes).map(([name, r]) => (
+            <ul className="divide-y divide-gray-200 border-y border-gray-200">
+              {Object.entries(recipes).map(([name, r]) => (
+                <li key={name}>
                   <button
-                    key={name}
                     onClick={() => setSelectedRecipe(name)}
-                    className="text-left p-4 bg-gray-50 hover:bg-brand-50 border border-gray-100 hover:border-brand-200 rounded-xl transition-colors"
+                    className="flex w-full items-baseline justify-between gap-4 py-4 text-left hover:text-brand-600"
                   >
-                    <div className="font-medium text-gray-900 text-sm mb-1">{r.name}</div>
-                    <div className="text-xs text-gray-400">
-                      ⏱️ {r.time} min · 👥 {r.servings} os. · 🔥 {r.calories} kcal
-                    </div>
+                    <span className="text-lg font-semibold">{r.name}</span>
+                    <span className="whitespace-nowrap text-sm text-gray-500">
+                      {r.time} min, {r.servings} os.
+                    </span>
                   </button>
-                ))}
-              </div>
-            </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

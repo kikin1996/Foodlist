@@ -1,145 +1,136 @@
 import Link from "next/link";
 
+const SAMPLE_WEEK = [
+  { day: "Po", dinner: "Dušená kuřecí stehna s rýží" },
+  { day: "Út", dinner: "Čočková polévka s uzeným" },
+  { day: "St", dinner: "Rizoto s hráškem a parmazánem" },
+  { day: "Čt", dinner: "Hovězí chilli con carne" },
+  { day: "Pá", dinner: "Losos z pečicí pánve" },
+];
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">F</span>
-          </div>
-          <span className="font-bold text-gray-900 text-lg">Kostki</span>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/login"
-            className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium text-sm"
-          >
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6">
+        <span className="font-display text-2xl font-extrabold tracking-tight text-brand-600">Kostki</span>
+        <nav className="flex items-center gap-5 text-sm font-medium">
+          <Link href="/login" className="text-gray-600 hover:text-gray-900">
             Přihlásit se
           </Link>
           <Link
             href="/register"
-            className="px-4 py-2 bg-brand-600 text-white rounded-lg font-medium text-sm hover:bg-brand-700 transition-colors"
+            className="bg-brand-600 px-4 py-2.5 text-white hover:bg-brand-700 transition-colors"
           >
-            Začít zdarma
+            Vytvořit účet
           </Link>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-50 text-brand-700 rounded-full text-sm font-medium mb-6">
-          <span className="w-2 h-2 bg-brand-500 rounded-full animate-pulse"></span>
-          Automatický nákup přes Rohlík.cz
-        </div>
-        <h1 className="text-5xl font-bold text-gray-900 leading-tight mb-6">
-          Zdravé jídlo bez<br />
-          <span className="text-brand-600">jakékoli námahy</span>
-        </h1>
-        <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10">
-          Navolíte si, jak zdravě a chutně chcete jíst. My vytvoříme jídelníček,
-          nakoupíme suroviny na Rohlíku a vy jen uvaříte podle receptu.
-        </p>
-        <div className="flex gap-4 justify-center">
-          <Link
-            href="/register"
-            className="px-8 py-4 bg-brand-600 text-white rounded-xl font-semibold text-lg hover:bg-brand-700 transition-colors shadow-lg shadow-brand-200"
-          >
-            Vytvořit účet zdarma
-          </Link>
-          <Link
-            href="#jak-to-funguje"
-            className="px-8 py-4 border border-gray-200 text-gray-700 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-colors"
-          >
-            Jak to funguje?
-          </Link>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="jak-to-funguje" className="max-w-6xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-center text-gray-900 mb-4">
-          3 kroky k jídlu bez starostí
-        </h2>
-        <p className="text-center text-gray-500 mb-12">
-          Jednou nastavíte, pak už jen přebíráte nákup a vaříte
-        </p>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            {
-              step: "01",
-              icon: "🎛️",
-              title: "Nastavíte preference",
-              desc: "Řeknete nám, jak zdravě a chutně chcete jíst, kolik vás je doma a jaký máte rozpočet.",
-            },
-            {
-              step: "02",
-              icon: "🤖",
-              title: "AI vytvoří jídelníček",
-              desc: "Claude AI sestaví týdenní jídelníček na míru a automaticky nakoupí vše potřebné na Rohlíku.",
-            },
-            {
-              step: "03",
-              icon: "🛒",
-              title: "Vy jen potvrdíte",
-              desc: "Dostanete notifikaci, zkontrolujete košík a potvrdíte objednávku na Rohlík.cz. To je vše.",
-            },
-          ].map((item) => (
-            <div key={item.step} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-              <div className="text-4xl mb-4">{item.icon}</div>
-              <div className="text-xs font-bold text-brand-500 mb-2">{item.step}</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">{item.title}</h3>
-              <p className="text-gray-500 leading-relaxed">{item.desc}</p>
+      <main className="mx-auto max-w-5xl px-5">
+        <section className="grid gap-12 pb-20 pt-10 md:grid-cols-[1.1fr_1fr] md:items-center md:pt-16">
+          <div>
+            <h1 className="text-[2.75rem] font-extrabold md:text-6xl">
+              Týden jídel a nákupní seznam za pár minut.
+            </h1>
+            <p className="mt-6 max-w-md text-lg leading-relaxed text-gray-600">
+              Řekněte, jak chcete jíst a kolik vás je. Kostki sestaví jídelníček
+              a z produktů, které jsou na Rohlík.cz dnes skladem, udělá nákupní
+              seznam. Ten si přečtete v mobilu jedním naskenováním QR kódu.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/register"
+                className="bg-brand-600 px-6 py-3.5 text-base font-semibold text-white hover:bg-brand-700 transition-colors"
+              >
+                Vytvořit účet zdarma
+              </Link>
+              <Link
+                href="#jak-to-funguje"
+                className="border-b-2 border-gray-900 py-3.5 text-base font-semibold text-gray-900 hover:border-brand-600 hover:text-brand-600 transition-colors"
+              >
+                Jak to funguje
+              </Link>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
 
-      {/* Features */}
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Vše co potřebujete
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { icon: "🥗", title: "Jídelníček na míru", desc: "Zdravost vs. chutnost, diety, alergie, oblíbené kuchyně" },
-              { icon: "📋", title: "Recepty s kroky", desc: "Každé jídlo má detailní recept s přesným časem přípravy" },
-              { icon: "🛒", title: "Auto-nákup Rohlík", desc: "Přímo napojeno na váš Rohlík účet přes MCP" },
-              { icon: "💰", title: "Respektuje rozpočet", desc: "Nastavíte týdenní limit, AI ho dodrží" },
-              { icon: "📱", title: "Notifikace", desc: "Upozornění před každou objednávkou ke kontrole" },
-              { icon: "🔄", title: "Každý týden nové", desc: "Žádné opakování jídel, stále čerstvé nápady" },
-            ].map((f) => (
-              <div key={f.title} className="bg-white rounded-xl p-6 border border-gray-100">
-                <div className="text-3xl mb-3">{f.icon}</div>
-                <h3 className="font-semibold text-gray-900 mb-1">{f.title}</h3>
-                <p className="text-sm text-gray-500">{f.desc}</p>
+          <div className="border-2 border-gray-900">
+            <div className="grid grid-cols-[3.5rem_1fr] border-b-2 border-gray-900 bg-gray-900 px-4 py-3 text-sm font-semibold text-white">
+              <span>Den</span>
+              <span>Večeře</span>
+            </div>
+            {SAMPLE_WEEK.map((row) => (
+              <div
+                key={row.day}
+                className="grid grid-cols-[3.5rem_1fr] items-baseline gap-2 border-b border-gray-200 px-4 py-3.5 last:border-b-0"
+              >
+                <span className="font-display text-lg font-bold text-brand-600">{row.day}</span>
+                <span className="text-[0.95rem] text-gray-800">{row.dinner}</span>
               </div>
             ))}
           </div>
+        </section>
+
+        <section id="jak-to-funguje" className="border-t-2 border-gray-900 py-16">
+          <h2 className="text-3xl font-bold md:text-4xl">Jak to funguje</h2>
+          <ol className="mt-10 grid gap-10 md:grid-cols-3">
+            <li>
+              <h3 className="text-xl">Nastavíte preference</h3>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Zdravost, chutnost, diety, alergie, rozpočet a počet lidí u stolu.
+              </p>
+            </li>
+            <li>
+              <h3 className="text-xl">Dostanete jídelníček</h3>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Ke každému jídlu recept. Jedno jídlo můžete přegenerovat, když se
+                vám nechce.
+              </p>
+            </li>
+            <li>
+              <h3 className="text-xl">Nakoupíte podle seznamu</h3>
+              <p className="mt-3 leading-relaxed text-gray-600">
+                Seznam naskenujete v mobilu nebo si ho uložíte jako fotku. U položek
+                vidíte přímý odkaz na produkt na Rohlík.cz.
+              </p>
+            </li>
+          </ol>
+        </section>
+
+        <section className="border-t border-gray-200 py-16">
+          <h2 className="text-3xl font-bold md:text-4xl">Co umí</h2>
+          <ul className="mt-10 grid gap-x-10 gap-y-8 md:grid-cols-2">
+            {[
+              ["Jídla na míru", "Víc zeleniny, nebo víc chuti. Vy určíte poměr."],
+              ["Chytré kuchyňské roboty", "Thermomix a Monsieur Cuisine: jídla, která v nich půjdou udělat, a jejich postup."],
+              ["Skladem dnes", "Nákupní seznam jen z produktů, které Rohlík právě nabízí."],
+              ["Historie týdnů", "Staré jídelníčky si odložíte a vrátíte se k nim kdykoli."],
+            ].map(([title, desc]) => (
+              <li key={title} className="border-l-4 border-brand-600 pl-5">
+                <h3 className="text-lg">{title}</h3>
+                <p className="mt-2 leading-relaxed text-gray-600">{desc}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="border-t-2 border-gray-900 py-16">
+          <h2 className="max-w-xl text-3xl font-bold md:text-4xl">
+            Registrace je zdarma. Na Rohlík.cz účet nepotřebujete.
+          </h2>
+          <Link
+            href="/register"
+            className="mt-8 inline-block bg-brand-600 px-8 py-4 text-base font-semibold text-white hover:bg-brand-700 transition-colors"
+          >
+            Vytvořit účet
+          </Link>
+        </section>
+      </main>
+
+      <footer className="border-t border-gray-200">
+        <div className="mx-auto flex max-w-5xl flex-wrap justify-between gap-2 px-5 py-6 text-sm text-gray-500">
+          <span className="font-display font-bold text-gray-900">Kostki</span>
+          <span>Jídelníček a nákupní seznam pro české domácnosti</span>
         </div>
-      </section>
-
-      {/* CTA */}
-      <section className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-          Připraveni začít?
-        </h2>
-        <p className="text-gray-500 mb-8">
-          Registrace je zdarma. Potřebujete jen účet na Rohlík.cz.
-        </p>
-        <Link
-          href="/register"
-          className="inline-block px-10 py-4 bg-brand-600 text-white rounded-xl font-semibold text-lg hover:bg-brand-700 transition-colors"
-        >
-          Začít zdarma
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">
-        Kostki © 2025 · Vytvořeno s Claude AI + Rohlík MCP
       </footer>
     </div>
   );
