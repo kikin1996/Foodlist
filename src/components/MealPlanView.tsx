@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ShoppingListQR from "./ShoppingListQR";
 
 const DAY_LABELS: Record<string, string> = {
@@ -48,6 +49,28 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
   const [applianceVersions, setApplianceVersions] = useState<Record<string, { steps: string[] }>>({});
   const [applianceLoading, setApplianceLoading] = useState(false);
   const [applianceError, setApplianceError] = useState("");
+  const [regenSlot, setRegenSlot] = useState<string | null>(null);
+  const [regenError, setRegenError] = useState("");
+  const router = useRouter();
+
+  async function regenerateSlot(day: string, meal: string) {
+    setRegenSlot(`${day}:${meal}`);
+    setRegenError("");
+    try {
+      const res = await fetch(`/api/meal-plan/${plan.id}/meal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day, meal }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Přegenerování selhalo");
+      router.refresh();
+    } catch (err) {
+      setRegenError(err instanceof Error ? err.message : "Chyba");
+    } finally {
+      setRegenSlot(null);
+    }
+  }
 
   function toggleCategory(cat: string) {
     setOpenCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -134,6 +157,7 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
       {/* Meals tab */}
       {activeTab === "meals" && (
         <div className="divide-y divide-gray-50">
+          {regenError && <p className="p-4 text-sm text-red-600">{regenError}</p>}
           {days.map((day) => (
             <div key={day} className="p-5">
               <div className="font-semibold text-gray-900 mb-3">
@@ -142,8 +166,18 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
               <div className="grid grid-cols-3 gap-3">
                 {(["breakfast", "lunch", "dinner"] as const).map((meal) => (
                   <div key={meal} className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-xs text-gray-400 mb-1">
-                      {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-400">
+                        {MEAL_ICONS[meal]} {MEAL_LABELS[meal]}
+                      </span>
+                      <button
+                        onClick={() => regenerateSlot(day, meal)}
+                        disabled={regenSlot !== null}
+                        title="Přegenerovat toto jídlo"
+                        className="w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:text-brand-600 hover:bg-white text-sm disabled:opacity-40"
+                      >
+                        {regenSlot === `${day}:${meal}` ? "…" : "↻"}
+                      </button>
                     </div>
                     <button
                       onClick={() => {
@@ -223,6 +257,17 @@ export default function MealPlanView({ plan, kitchenAppliance = "none" }: MealPl
                                 className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-300 text-gray-400 hover:text-brand-600 hover:border-brand-400 text-[10px] font-semibold"
                               >
                                 i
+                              </a>
+                            )}
+                            {!item.rohlikUrl && (
+                              <a
+                                href={`https://www.rohlik.cz/hledat?q=${encodeURIComponent(item.name)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Hledat na Rohlík.cz"
+                                className="text-xs opacity-60 hover:opacity-100"
+                              >
+                                🔍
                               </a>
                             )}
                           </span>

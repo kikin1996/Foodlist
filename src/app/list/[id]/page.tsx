@@ -79,6 +79,17 @@ export default async function ShoppingListPage({ params }: { params: Promise<{ i
                             i
                           </a>
                         )}
+                        {!item.rohlikUrl && (
+                          <a
+                            href={`https://www.rohlik.cz/hledat?q=${encodeURIComponent(item.name)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Hledat na Rohlík.cz"
+                            className="text-xs opacity-60"
+                          >
+                            🔍
+                          </a>
+                        )}
                       </span>
                       {item.rohlikPrice != null && (
                         <span className="text-gray-500 font-medium whitespace-nowrap">

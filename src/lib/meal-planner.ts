@@ -164,3 +164,46 @@ Recepty pouze pro unikátní jídla (nesnídaně jako ovesná kaše nemusí mít
 
   return JSON.parse(jsonMatch[0]) as WeeklyMealPlan;
 }
+
+export async function regenerateMeal(
+  prefs: UserPreferences,
+  mealLabel: string,
+  avoid: string[]
+): Promise<{ name: string; recipe: Recipe }> {
+  const appliance = APPLIANCE_LABELS[prefs.kitchenAppliance];
+  const diets: string[] = [];
+  if (prefs.isVegetarian) diets.push("vegetariánské");
+  if (prefs.isVegan) diets.push("veganské");
+  if (prefs.isGlutenFree) diets.push("bezlepkové");
+  if (prefs.isLactoseFree) diets.push("bez laktózy");
+
+  const response = await client.chat.completions.create({
+    model: resolveModel(prefs.aiModel),
+    max_completion_tokens: 3000,
+    reasoning_effort: "low",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `Jsi šéfkuchař specializující se na českou domácí kuchyni. Odpovídej POUZE validním JSON. Porce: ${prefs.householdSize}. Zdravost ${prefs.healthLevel}/10, chutnost ${prefs.tastyLevel}/10.${appliance ? ` Preferuj jídlo, které jde připravit v ${appliance}.` : ""}`,
+      },
+      {
+        role: "user",
+        content: `Navrhni JINÉ jídlo pro: ${mealLabel}.
+Nesmí být žádné z těchto: ${avoid.join(", ")}.
+${diets.length ? `Dieta: ${diets.join(", ")}.` : ""}
+${prefs.allergies ? `Alergie (nesmí obsahovat): ${prefs.allergies}.` : ""}
+${prefs.dislikedIngredients ? `Neoblíbené ingredience: ${prefs.dislikedIngredients}.` : ""}
+
+Vrať JSON: {"name": "...", "time": 20, "servings": ${prefs.householdSize}, "ingredients": [{"name": "...", "amount": "200g"}], "steps": ["..."], "calories": 400, "applianceSuitable": false}
+Max 3 kroky, max 6 ingrediencí. applianceSuitable: true jen pokud jde jídlo celé připravit v ${appliance ?? "robotu"}.`,
+      },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Empty response from OpenAI");
+  const parsed = JSON.parse(text) as Recipe;
+  if (!parsed.name) throw new Error("AI nevrátila jídlo");
+  return { name: parsed.name, recipe: parsed };
+}
