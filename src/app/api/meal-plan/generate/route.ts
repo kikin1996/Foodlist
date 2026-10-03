@@ -31,7 +31,7 @@ export async function POST() {
 
       const cached = (prefs.rohlikCatalog as unknown as CatalogProduct[]) ?? [];
 
-      if (isCatalogFresh(prefs.catalogUpdatedAt ?? null) && cached.length > 0) {
+      if (isCatalogFresh(prefs.catalogUpdatedAt ?? null) && cached.some((p) => p.baseLink)) {
         // Použij cached katalog z DB
         catalog = cached;
         console.log(`Používám cached katalog: ${catalog.length} produktů`);
